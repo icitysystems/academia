@@ -1,0 +1,26 @@
+.lesson-tracking-layout {
+  display: flex;
+  min-height: calc(100vh - 64px); /* Subtract navbar height */
+  background: #f3f4f6;
+}
+
+.lesson-tracking-layout.full-width .lesson-tracking-content {
+  max-width: 100%;
+}
+
+.lesson-tracking-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .lesson-tracking-layout {
+    flex-direction: column;
+  }
+
+  .lesson-tracking-content {
+    min-height: calc(100vh - 64px - 80px); /* Subtract navbar and mobile sidebar height */
+  }
+}

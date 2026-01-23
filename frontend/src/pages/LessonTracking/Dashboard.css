@@ -1,0 +1,381 @@
+.lesson-tracking-dashboard {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #4f46e5;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #4338ca;
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+}
+
+/* Dashboard Cards */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-icon {
+  font-size: 2.5rem;
+}
+
+.card-content h3 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.card-content p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* Week Progress */
+.week-progress-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.week-progress-section h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.progress-bar-container {
+  background: #e5e7eb;
+  border-radius: 8px;
+  height: 40px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 1rem;
+  transition: width 0.3s;
+}
+
+.progress-bar span {
+  color: white;
+  font-weight: 600;
+}
+
+/* Dashboard Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.dashboard-section h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.no-data {
+  color: #9ca3af;
+  text-align: center;
+  padding: 2rem;
+  font-style: italic;
+}
+
+/* Lesson Cards */
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lesson-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+}
+
+.lesson-card:hover {
+  border-color: #4f46e5;
+  background: #f9fafb;
+}
+
+.lesson-time,
+.lesson-date {
+  font-weight: 600;
+  color: #4f46e5;
+  min-width: 80px;
+}
+
+.lesson-details {
+  flex: 1;
+}
+
+.lesson-details h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.lesson-details p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.lesson-duration {
+  font-weight: 600;
+  color: #059669;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-planned {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-in_progress {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+/* Progress Grid */
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.progress-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.progress-header h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.progress-header p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.progress-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.circular-progress svg text {
+  fill: #111827;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.badge-warning {
+  background: #fed7aa;
+  color: #ea580c;
+}
+
+/* Quick Links */
+.quick-links-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.quick-links-section h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.quick-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.quick-link-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.quick-link-card:hover {
+  border-color: #4f46e5;
+  transform: translateY(-2px);
+}
+
+.quick-link-card .icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.quick-link-card h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  color: #111827;
+}
+
+.quick-link-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.loading,
+.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 1.125rem;
+}
+
+.error {
+  color: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-links-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

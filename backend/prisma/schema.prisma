@@ -1,0 +1,1412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Identity Module
+// ============================================
+
+// User Role Enum as per Specification Section 2A
+// Student, Faculty, Admin, Support Staff, Parent, Alumni/Guest
+enum UserRole {
+  STUDENT
+  FACULTY
+  ADMIN
+  SUPPORT_STAFF
+  PARENT
+  ALUMNI
+  GUEST
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  googleId         String?  @unique
+  passwordHash     String?
+  name             String?
+  firstName        String?
+  lastName         String?
+  phone            String?
+  avatarUrl        String?
+  role             UserRole @default(STUDENT)
+  isActive         Boolean  @default(true)
+  emailVerified    Boolean  @default(false)
+  preferences      String? // JSON string for preferences
+  stripeCustomerId String? // Stripe customer ID for payments
+  lastLoginAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  templates        Template[]
+  annotations      Annotation[]
+  trainingSessions TrainingSession[]
+  gradingJobs      GradingJob[]
+  auditLogs        AuditLog[]
+  donations        Donation[]
+  subscriptions    Subscription[]
+
+  // Lesson Tracking Relations
+  teacherSchools TeacherSchool[]
+  classSubjects  ClassSubject[]
+  lessons        Lesson[]
+
+  // Online University Relations
+  instructedCourses Course[]      @relation("CourseInstructor")
+  enrollments       Enrollment[]  @relation("StudentEnrollments")
+  certificates      Certificate[] @relation("StudentCertificates")
+
+  // Quiz & Assessment Relations
+  createdQuizzes        OnlineQuiz[]           @relation("QuizCreator")
+  quizAttempts          QuizAttempt[]          @relation("QuizStudent")
+  createdAssignments    Assignment[]           @relation("AssignmentCreator")
+  assignmentSubmissions AssignmentSubmission[] @relation("AssignmentStudent")
+
+  // Discussion Relations
+  discussionThreads DiscussionThread[]   @relation("ThreadAuthor")
+  discussionPosts   DiscussionPost[]     @relation("PostAuthor")
+  announcements     CourseAnnouncement[] @relation("AnnouncementAuthor")
+
+  // Pedagogic Document Relations
+  generatedSchemes   SchemeOfWork[]          @relation("SchemeGenerator")
+  progressionRecords ProgressionRecord[]     @relation("ProgressionRecorder")
+  presentations      GeneratedPresentation[] @relation("PresentationCreator")
+  examPapers         ExamPaper[]             @relation("ExamPaperCreator")
+  questionBank       QuestionBank[]          @relation("QuestionBankCreator")
+  
+  // Exam Grading Workflow Relations
+  examPaperSetups    ExamPaperSetup[]
+  
+  // Parent-Student Relations
+  parentOf           StudentParent[]    @relation("Parent")
+  parentedBy         StudentParent[]    @relation("Student")
+  
+  // Support Ticket Relations
+  submittedTickets   SupportTicket[]    @relation("TicketSubmitter")
+  assignedTickets    SupportTicket[]    @relation("TicketAssignee")
+  
+  // Payment Relations
+  payments           Payment[]          @relation("UserPayments")
+  
+  // Transcript Requests
+  transcriptRequests TranscriptRequest[] @relation("TranscriptRequester")
+}
+
+// Parent-Student Relationship
+model StudentParent {
+  id        String   @id @default(cuid())
+  parentId  String
+  parent    User     @relation("Parent", fields: [parentId], references: [id])
+  studentId String
+  student   User     @relation("Student", fields: [studentId], references: [id])
+  relationship String @default("PARENT") // PARENT, GUARDIAN
+  canViewGrades    Boolean @default(true)
+  canViewPayments  Boolean @default(true)
+  canReceiveNotifications Boolean @default(true)
+  createdAt DateTime @default(now())
+  
+  @@unique([parentId, studentId])
+}
+
+// Support Ticket System (for Support Staff)
+model SupportTicket {
+  id          String   @id @default(cuid())
+  submitterId String
+  submitter   User     @relation("TicketSubmitter", fields: [submitterId], references: [id])
+  assigneeId  String?
+  assignee    User?    @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  
+  title       String
+  description String
+  category    String   // TECHNICAL, BILLING, ACADEMIC, GENERAL
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  comments    TicketComment[]
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  content   String
+  isInternal Boolean @default(false) // Internal notes for support staff
+  createdAt DateTime @default(now())
+}
+
+// Payment System
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("UserPayments", fields: [userId], references: [id])
+  
+  amount      Float
+  currency    String   @default("USD")
+  type        String   // TUITION, FEE, COURSE_PURCHASE
+  status      String   @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  description String?
+  
+  stripePaymentId String?
+  receiptUrl      String?
+  
+  dueDate     DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Transcript Requests
+model TranscriptRequest {
+  id          String   @id @default(cuid())
+  requesterId String
+  requester   User     @relation("TranscriptRequester", fields: [requesterId], references: [id])
+  
+  purpose     String?
+  copies      Int      @default(1)
+  deliveryMethod String @default("DIGITAL") // DIGITAL, MAIL
+  address     String?  // For mail delivery
+  
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, CANCELLED
+  processedAt DateTime?
+  documentUrl String?  // URL to generated transcript PDF
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// Template & Asset Management
+// ============================================
+model Template {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  version      Int      @default(1)
+  imageUrl     String? // URL for blank template image
+  thumbnailUrl String?
+  answerKeyUrl String? // URL for answer key
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Owner
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  // Relations
+  regions     TemplateRegion[]
+  sheets      AnswerSheet[]
+  annotations Annotation[]
+  models      MLModel[]
+  gradingJobs GradingJob[]
+}
+
+model TemplateRegion {
+  id         String   @id @default(cuid())
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  label        String // e.g., "Question 1", "Name Field"
+  questionType String // MCQ, SHORT_ANSWER, LONG_ANSWER, TRUE_FALSE, NUMERIC, DIAGRAM
+  points       Float  @default(1)
+
+  // Bounding box coordinates (percentage-based for scaling)
+  bboxX      Float
+  bboxY      Float
+  bboxWidth  Float
+  bboxHeight Float
+
+  orderIndex Int     @default(0)
+  metadata   String? // JSON string for additional config
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  questionLabels QuestionLabel[]
+  gradingResults GradingResult[]
+}
+
+// ============================================
+// Answer Sheets (Scanned Student Work)
+// ============================================
+model AnswerSheet {
+  id         String   @id @default(cuid())
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id])
+
+  studentId   String? // Optional student identifier
+  studentName String?
+
+  originalUrl  String // URL for original scan
+  processedUrl String? // URL for preprocessed image
+  thumbnailUrl String?
+
+  status  String  @default("UPLOADED") // UPLOADED, PROCESSING, PROCESSED, ANNOTATED, GRADED, REVIEWED, ERROR
+  ocrData String? // JSON string for OCR data per region
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  annotations    Annotation[]
+  gradingResults GradingResult[]
+  pdfOutput      PDFOutput?
+}
+
+// ============================================
+// Annotation UI (Training Input)
+// ============================================
+model Annotation {
+  id         String      @id @default(cuid())
+  sheetId    String
+  sheet      AnswerSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  templateId String
+  template   Template    @relation(fields: [templateId], references: [id])
+  teacherId  String
+  teacher    User        @relation(fields: [teacherId], references: [id])
+
+  strokes  String? // JSON string for canvas stroke data
+  comments String? // General comments
+
+  isTrainingData Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  questionLabels QuestionLabel[]
+}
+
+model QuestionLabel {
+  id           String         @id @default(cuid())
+  annotationId String
+  annotation   Annotation     @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  regionId     String
+  region       TemplateRegion @relation(fields: [regionId], references: [id])
+
+  correctness String // CORRECT, PARTIAL, INCORRECT, SKIPPED
+  score       Float // Assigned score (0 to region.points)
+  confidence  Float? // Teacher confidence (optional)
+  comment     String?
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// ML Training & Models
+// ============================================
+model TrainingSession {
+  id        String @id @default(cuid())
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id])
+
+  status       String  @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, CANCELLED
+  config       String? // JSON string for training hyperparameters
+  metrics      String? // JSON string for accuracy, loss, validation scores
+  errorMessage String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  models MLModel[]
+}
+
+model MLModel {
+  id         String           @id @default(cuid())
+  templateId String
+  template   Template         @relation(fields: [templateId], references: [id])
+  trainingId String?
+  training   TrainingSession? @relation(fields: [trainingId], references: [id])
+
+  version     Int     @default(1)
+  artifactUrl String // URL for model weights
+  accuracy    Float?
+  metadata    String? // JSON string for model architecture, features
+
+  isActive Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  gradingJobs GradingJob[]
+}
+
+// ============================================
+// Grading Engine
+// ============================================
+model GradingJob {
+  id         String   @id @default(cuid())
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id])
+  modelId    String
+  model      MLModel  @relation(fields: [modelId], references: [id])
+  teacherId  String
+  teacher    User     @relation(fields: [teacherId], references: [id])
+
+  status          String  @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED, CANCELLED
+  totalSheets     Int     @default(0)
+  processedSheets Int     @default(0)
+  errorMessage    String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  results GradingResult[]
+}
+
+model GradingResult {
+  id       String         @id @default(cuid())
+  jobId    String
+  job      GradingJob     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sheetId  String
+  sheet    AnswerSheet    @relation(fields: [sheetId], references: [id])
+  regionId String
+  region   TemplateRegion @relation(fields: [regionId], references: [id])
+
+  predictedCorrectness String // CORRECT, PARTIAL, INCORRECT, SKIPPED
+  confidence           Float // 0.0 to 1.0
+  assignedScore        Float
+  explanation          String? // Model rationale
+
+  needsReview Boolean   @default(false)
+  reviewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// Exam Grading Workflow
+// ============================================
+
+// Step 1: Teacher submits exam paper with questions
+model ExamPaperSetup {
+  id          String   @id @default(cuid())
+  title       String
+  subject     String
+  description String?
+  paperType   String   @default("EXAM") // EXAM, TEST, QUIZ, ASSIGNMENT
+  totalMarks  Float
+  duration    Int? // Duration in minutes
+  
+  teacherId   String
+  teacher     User     @relation(fields: [teacherId], references: [id])
+  
+  status      String   @default("DRAFT") // DRAFT, QUESTIONS_ADDED, RESPONSES_SET, MODERATION_READY, GRADING_ACTIVE, COMPLETED
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  questions         ExamQuestion[]
+  expectedResponses ExpectedResponse[]
+  moderationSamples ModerationSample[]
+  studentSubmissions StudentExamSubmission[]
+  gradingSession    ExamGradingSession?
+}
+
+// Questions in the exam paper
+model ExamQuestion {
+  id             String        @id @default(cuid())
+  examPaperId    String
+  examPaper      ExamPaperSetup @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  
+  questionNumber Int
+  questionText   String
+  questionType   String // MCQ, SHORT_ANSWER, LONG_ANSWER, TRUE_FALSE, NUMERIC, ESSAY, DIAGRAM
+  marks          Float
+  imageUrl       String? // Optional image for the question
+  
+  metadata       String? // JSON for additional config (options for MCQ, etc.)
+  
+  orderIndex     Int      @default(0)
+  createdAt      DateTime @default(now())
+  
+  // Relations
+  expectedResponses ExpectedResponse[]
+  studentResponses  StudentResponse[]
+}
+
+// Step 2: Expected responses / marking scheme
+model ExpectedResponse {
+  id            String        @id @default(cuid())
+  examPaperId   String
+  examPaper     ExamPaperSetup @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      ExamQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  expectedAnswer String // The expected answer text/pattern
+  markingScheme  String? // JSON: breakdown of marks for partial credit
+  keywords       String? // JSON: key terms that should appear
+  isAIGenerated  Boolean @default(false)
+  
+  // For multiple acceptable answers
+  alternativeAnswers String? // JSON array of alternative correct responses
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Step 3: Moderation samples - corrected papers for calibration
+model ModerationSample {
+  id          String         @id @default(cuid())
+  examPaperId String
+  examPaper   ExamPaperSetup @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  
+  studentName String?
+  imageUrl    String // Scanned corrected paper
+  totalScore  Float
+  feedback    String? // General feedback
+  
+  // Individual question scores and comments
+  questionScores String // JSON: [{questionId, score, comment}]
+  
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// Step 4: Student submissions for grading
+model StudentExamSubmission {
+  id          String         @id @default(cuid())
+  examPaperId String
+  examPaper   ExamPaperSetup @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  
+  studentId    String?
+  studentName  String
+  studentEmail String?
+  
+  imageUrl     String // Scanned answer sheet
+  thumbnailUrl String?
+  
+  status       String @default("UPLOADED") // UPLOADED, PROCESSING, GRADED, REVIEWED, ERROR
+  totalScore   Float?
+  percentage   Float?
+  grade        String? // A, B, C, D, E, F or equivalent
+  
+  feedback     String? // Overall feedback
+  gradedAt     DateTime?
+  reviewedAt   DateTime?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  responses StudentResponse[]
+  sessionId String?
+  session   ExamGradingSession? @relation(fields: [sessionId], references: [id])
+}
+
+// Individual question responses from students
+model StudentResponse {
+  id           String               @id @default(cuid())
+  submissionId String
+  submission   StudentExamSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     ExamQuestion         @relation(fields: [questionId], references: [id])
+  
+  extractedAnswer  String? // OCR/extracted answer text
+  assignedScore    Float?
+  maxScore         Float
+  
+  predictedCorrectness String? // CORRECT, PARTIAL, INCORRECT
+  confidence           Float? // AI confidence
+  explanation          String? // AI explanation
+  
+  teacherOverride  Float? // If teacher overrides the AI score
+  teacherComment   String?
+  needsReview      Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Grading session for batch processing
+model ExamGradingSession {
+  id          String         @id @default(cuid())
+  examPaperId String         @unique
+  examPaper   ExamPaperSetup @relation(fields: [examPaperId], references: [id])
+  
+  status              String @default("PENDING") // PENDING, CALIBRATING, GRADING, COMPLETED, FAILED
+  totalSubmissions    Int    @default(0)
+  gradedSubmissions   Int    @default(0)
+  reviewedSubmissions Int    @default(0)
+  
+  calibrationAccuracy Float? // Accuracy against moderation samples
+  averageConfidence   Float?
+  
+  errorMessage String?
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  submissions StudentExamSubmission[]
+}
+
+// ============================================
+// PDF Output & Print Management
+// ============================================
+model PDFOutput {
+  id      String      @id @default(cuid())
+  sheetId String      @unique
+  sheet   AnswerSheet @relation(fields: [sheetId], references: [id])
+
+  pdfUrl     String // URL for generated PDF
+  totalScore Float
+  maxScore   Float
+  breakdown  String? // JSON string for per-question score breakdown
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  printJobs PrintJob[]
+}
+
+model PrintJob {
+  id    String    @id @default(cuid())
+  pdfId String
+  pdf   PDFOutput @relation(fields: [pdfId], references: [id])
+
+  printerName  String?
+  status       String  @default("QUEUED") // QUEUED, PRINTING, COMPLETED, FAILED, CANCELLED
+  copies       Int     @default(1)
+  errorMessage String?
+
+  queuedAt  DateTime  @default(now())
+  printedAt DateTime?
+}
+
+// ============================================
+// Audit & Logging
+// ============================================
+model AuditLog {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  action     String // e.g., "UPLOAD_TEMPLATE", "START_TRAINING", "GRADE_BATCH"
+  entityType String? // e.g., "Template", "AnswerSheet"
+  entityId   String?
+  details    String? // JSON string for details
+  ipAddress  String?
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// Newsletter Subscriptions
+// ============================================
+model NewsletterSubscription {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  isActive       Boolean   @default(true)
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  source         String? // Where they signed up from (footer, popup, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Donations (Stripe)
+// ============================================
+model Donation {
+  id               String  @id @default(cuid())
+  email            String
+  name             String?
+  amount           Int // Amount in cents
+  currency         String  @default("usd")
+  stripePaymentId  String? @unique
+  stripeCustomerId String?
+  status           String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  message          String? // Optional donor message
+  isAnonymous      Boolean @default(false)
+
+  // Link to user if logged in
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+// ============================================
+// Subscription Plans & User Subscriptions
+// ============================================
+model SubscriptionPlan {
+  id                   String  @id @default(cuid())
+  name                 String // e.g., "Basic", "Pro", "Enterprise"
+  description          String?
+  tier                 Int     @default(0) // 0=Free, 1=Basic, 2=Pro, 3=Enterprise
+  priceMonthly         Int // Price in cents per month
+  priceYearly          Int? // Price in cents per year (discounted)
+  stripePriceIdMonthly String? // Stripe Price ID for monthly
+  stripePriceIdYearly  String? // Stripe Price ID for yearly
+  stripeProductId      String? // Stripe Product ID
+  features             String? // JSON array of feature strings
+
+  // Usage Limits
+  maxTemplates         Int? // Limit on templates
+  maxSheetsPerMonth    Int? // Limit on sheets graded per month
+  maxModelsPerTemplate Int? // Limit on ML models per template
+  maxStorageMB         Int? // Storage limit in MB
+
+  // Feature Flags
+  hasAdvancedAnalytics Boolean @default(false)
+  hasAPIAccess         Boolean @default(false)
+  hasPrioritySupport   Boolean @default(false)
+  hasCustomBranding    Boolean @default(false)
+  hasTeamFeatures      Boolean @default(false)
+
+  // Discount offers for higher tiers
+  discountPercentYearly Int @default(0) // e.g., 20 for 20% off yearly
+  trialDays             Int @default(0) // Free trial days
+
+  priority Int     @default(0) // For ordering plans
+  isActive Boolean @default(true)
+  isPublic Boolean @default(true) // Show on pricing page
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id])
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  stripeSubscriptionId String? @unique
+  stripeCustomerId     String?
+
+  status              String    @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELED, TRIALING
+  billingCycle        String    @default("MONTHLY") // MONTHLY, YEARLY
+  priceAtSubscription Int? // Price at time of subscription (cents)
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  cancelAtPeriodEnd   Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Lesson Tracking Module
+// ============================================
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  address   String?
+  phone     String?
+  email     String?
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teachers TeacherSchool[]
+  classes  Class[]
+}
+
+model TeacherSchool {
+  id        String   @id @default(cuid())
+  teacherId String
+  schoolId  String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  teacher User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, schoolId])
+}
+
+model Class {
+  id           String   @id @default(cuid())
+  schoolId     String
+  name         String // e.g., "Grade 10-A"
+  gradeLevel   String // e.g., "Grade 10"
+  section      String? // e.g., "A", "Science Stream"
+  academicYear String // e.g., "2025-2026"
+  term         String? // e.g., "Term 1", "Semester 1"
+  studentCount Int?
+  schedule     String? // JSON: days and times
+  status       String   @default("ACTIVE") // ACTIVE, ARCHIVED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classSubjects ClassSubject[]
+  lessons       Lesson[]
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String // e.g., "Mathematics"
+  code        String? // e.g., "MATH10"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  classSubjects ClassSubject[]
+  syllabi       Syllabus[]
+}
+
+model ClassSubject {
+  id          String    @id @default(cuid())
+  classId     String
+  subjectId   String
+  teacherId   String
+  totalHours  Float? // Total curriculum hours
+  weeklyHours Float? // Weekly allocation
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  class    Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject  Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher  User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  syllabus Syllabus?
+  lessons  Lesson[]
+
+  // Online Quiz & Assessment Relations
+  quizzes            OnlineQuiz[]
+  assignments        Assignment[]
+  discussions        DiscussionThread[]
+  progressionRecords ProgressionRecord[]
+
+  @@unique([classId, subjectId])
+}
+
+model Syllabus {
+  id             String   @id @default(cuid())
+  classSubjectId String   @unique
+  name           String
+  description    String?
+  documentUrl    String? // Original uploaded syllabus
+  isTemplate     Boolean  @default(false)
+  templateSource String? // e.g., "CBSE", "ICSE"
+  totalTopics    Int      @default(0)
+  totalHours     Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  classSubject ClassSubject   @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  subject      Subject        @relation(fields: [subjectId], references: [id])
+  subjectId    String
+  units        SyllabusUnit[]
+  schemeOfWork SchemeOfWork? // Generated scheme of work
+}
+
+model SyllabusUnit {
+  id             String   @id @default(cuid())
+  syllabusId     String
+  title          String // e.g., "Unit 1: Algebra"
+  description    String?
+  orderIndex     Int
+  estimatedHours Float?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  syllabus Syllabus          @relation(fields: [syllabusId], references: [id], onDelete: Cascade)
+  chapters SyllabusChapter[]
+}
+
+model SyllabusChapter {
+  id             String   @id @default(cuid())
+  unitId         String
+  title          String // e.g., "Chapter 1: Linear Equations"
+  description    String?
+  orderIndex     Int
+  estimatedHours Float?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  unit   SyllabusUnit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  topics SyllabusTopic[]
+}
+
+model SyllabusTopic {
+  id               String   @id @default(cuid())
+  chapterId        String
+  title            String // e.g., "Solving linear equations in one variable"
+  description      String?
+  orderIndex       Int
+  estimatedHours   Float?
+  learningOutcomes String? // JSON array
+  prerequisites    String? // JSON array of topic IDs
+  createdAt        DateTime @default(now())
+
+  // Relations
+  chapter SyllabusChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  lessons LessonTopic[]
+}
+
+model Lesson {
+  id               String   @id @default(cuid())
+  classId          String
+  classSubjectId   String
+  teacherId        String
+  date             DateTime
+  duration         Float // in hours
+  teachingMethod   String? // LECTURE, DEMONSTRATION, GROUP_WORK, LAB, ACTIVITY, DISCUSSION, ASSESSMENT
+  materialsUsed    String? // JSON array
+  homeworkAssigned String?
+  notes            String?
+  attendance       String? // JSON: {present: 25, total: 30}
+  status           String   @default("COMPLETED") // PLANNED, COMPLETED, IN_PROGRESS, SKIPPED, RESCHEDULED
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  class        Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject       @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  teacher      User               @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  topics       LessonTopic[]
+  attachments  LessonAttachment[]
+}
+
+model LessonTopic {
+  id        String   @id @default(cuid())
+  lessonId  String
+  topicId   String
+  createdAt DateTime @default(now())
+
+  // Relations
+  lesson Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  topic  SyllabusTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, topicId])
+}
+
+model LessonAttachment {
+  id        String   @id @default(cuid())
+  lessonId  String
+  fileName  String
+  fileUrl   String
+  fileType  String // PDF, DOCX, PPT, IMAGE, LINK
+  fileSize  Int? // in bytes
+  createdAt DateTime @default(now())
+
+  // Relations
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// Online University Module
+// ============================================
+
+model Course {
+  id               String    @id @default(cuid())
+  code             String    @unique // e.g., "CS101"
+  title            String
+  description      String?
+  shortDescription String?
+  thumbnailUrl     String?
+  bannerUrl        String?
+  instructorId     String
+  categoryId       String?
+  level            String    @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  language         String    @default("en")
+  duration         Int? // Total hours
+  price            Int       @default(0) // Price in cents, 0 = free
+  currency         String    @default("XAF")
+  status           String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  isPublic         Boolean   @default(false)
+  maxEnrollments   Int? // null = unlimited
+  startDate        DateTime?
+  endDate          DateTime?
+  prerequisites    String? // JSON array of course IDs
+  learningOutcomes String? // JSON array
+  syllabus         String? // Rich text syllabus
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  instructor    User                 @relation("CourseInstructor", fields: [instructorId], references: [id])
+  category      CourseCategory?      @relation(fields: [categoryId], references: [id])
+  modules       CourseModule[]
+  enrollments   Enrollment[]
+  announcements CourseAnnouncement[]
+  discussions   DiscussionThread[]
+  certificates  Certificate[]
+}
+
+model CourseCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  iconUrl     String?
+  parentId    String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  // Self-relation for nested categories
+  parent   CourseCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children CourseCategory[] @relation("CategoryHierarchy")
+  courses  Course[]
+}
+
+model CourseModule {
+  id          String    @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  orderIndex  Int
+  isPublished Boolean   @default(false)
+  unlockDate  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons CourseLesson[]
+}
+
+model CourseLesson {
+  id          String   @id @default(cuid())
+  moduleId    String
+  title       String
+  description String?
+  contentType String // VIDEO, TEXT, PDF, QUIZ, ASSIGNMENT, LIVE_SESSION
+  contentUrl  String? // URL for video/PDF/external content
+  contentText String? // Rich text content
+  duration    Int? // Duration in minutes
+  orderIndex  Int
+  isPublished Boolean  @default(false)
+  isFree      Boolean  @default(false) // Preview lesson
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  module     CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress   LessonProgress[]
+  quiz       OnlineQuiz?
+  assignment Assignment?
+}
+
+model Enrollment {
+  id             String    @id @default(cuid())
+  courseId       String
+  studentId      String
+  status         String    @default("ACTIVE") // ACTIVE, COMPLETED, DROPPED, SUSPENDED
+  enrolledAt     DateTime  @default(now())
+  completedAt    DateTime?
+  progress       Float     @default(0) // 0-100 percentage
+  lastAccessedAt DateTime?
+  certificateId  String?   @unique
+
+  // Payment info
+  paymentId  String?
+  amountPaid Int?
+
+  // Relations
+  course         Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student        User                   @relation("StudentEnrollments", fields: [studentId], references: [id])
+  lessonProgress LessonProgress[]
+  quizAttempts   QuizAttempt[]
+  submissions    AssignmentSubmission[]
+  certificate    Certificate?           @relation(fields: [certificateId], references: [id])
+
+  @@unique([courseId, studentId])
+}
+
+model LessonProgress {
+  id              String    @id @default(cuid())
+  enrollmentId    String
+  lessonId        String
+  status          String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED
+  progressPercent Float     @default(0)
+  timeSpent       Int       @default(0) // seconds
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+// ============================================
+// Online Quiz & Assessment System
+// ============================================
+
+model OnlineQuiz {
+  id                 String    @id @default(cuid())
+  lessonId           String?   @unique // Link to course lesson (optional)
+  classSubjectId     String? // Link to class subject for school quizzes
+  title              String
+  description        String?
+  instructions       String?
+  createdById        String
+  type               String    @default("QUIZ") // QUIZ, EXAM, PRACTICE, SURVEY
+  totalMarks         Int
+  passingMarks       Int?
+  duration           Int? // Time limit in minutes, null = unlimited
+  maxAttempts        Int       @default(1)
+  shuffleQuestions   Boolean   @default(false)
+  shuffleOptions     Boolean   @default(false)
+  showResults        String    @default("IMMEDIATELY") // IMMEDIATELY, AFTER_DEADLINE, MANUAL, NEVER
+  showCorrectAnswers Boolean   @default(true)
+  showFeedback       Boolean   @default(true)
+  availableFrom      DateTime?
+  availableUntil     DateTime?
+  accessCode         String? // Optional access code
+  status             String    @default("DRAFT") // DRAFT, PUBLISHED, CLOSED, ARCHIVED
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  lesson       CourseLesson?  @relation(fields: [lessonId], references: [id])
+  classSubject ClassSubject?  @relation(fields: [classSubjectId], references: [id])
+  createdBy    User           @relation("QuizCreator", fields: [createdById], references: [id])
+  questions    QuizQuestion[]
+  attempts     QuizAttempt[]
+}
+
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  quizId        String
+  type          String // MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, FILL_BLANK, MATCHING, ORDERING
+  questionText  String
+  questionMedia String? // URL for image/audio/video
+  options       String? // JSON array for MCQ/matching options
+  correctAnswer String? // JSON for correct answer(s)
+  explanation   String? // Explanation shown after answering
+  marks         Float
+  negativeMarks Float    @default(0)
+  difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
+  topic         String?
+  orderIndex    Int
+  isRequired    Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  quiz      OnlineQuiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  responses QuizResponse[]
+}
+
+model QuizAttempt {
+  id            String    @id @default(cuid())
+  quizId        String
+  studentId     String
+  enrollmentId  String? // For course quizzes
+  attemptNumber Int       @default(1)
+  status        String    @default("IN_PROGRESS") // IN_PROGRESS, SUBMITTED, TIMED_OUT, GRADED
+  startedAt     DateTime  @default(now())
+  submittedAt   DateTime?
+  timeSpent     Int? // seconds
+  totalScore    Float?
+  maxScore      Float?
+  percentage    Float?
+  grade         String? // A, B, C, etc.
+  passed        Boolean?
+  feedback      String? // Teacher feedback
+  gradedAt      DateTime?
+  gradedById    String?
+
+  // Relations
+  quiz       OnlineQuiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student    User           @relation("QuizStudent", fields: [studentId], references: [id])
+  enrollment Enrollment?    @relation(fields: [enrollmentId], references: [id])
+  responses  QuizResponse[]
+}
+
+model QuizResponse {
+  id           String   @id @default(cuid())
+  attemptId    String
+  questionId   String
+  response     String? // JSON for student's answer
+  isCorrect    Boolean?
+  marksAwarded Float?
+  feedback     String?
+  timeSpent    Int? // seconds on this question
+  flagged      Boolean  @default(false) // Student flagged for review
+  answeredAt   DateTime @default(now())
+
+  // Relations
+  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
+
+// ============================================
+// Assignments
+// ============================================
+
+model Assignment {
+  id               String    @id @default(cuid())
+  lessonId         String?   @unique
+  classSubjectId   String?
+  title            String
+  description      String?
+  instructions     String?
+  createdById      String
+  dueDate          DateTime?
+  totalMarks       Int
+  allowLate        Boolean   @default(false)
+  latePenalty      Float     @default(0) // Percentage deducted per day
+  maxFileSize      Int? // Max file size in MB
+  allowedFileTypes String? // JSON array: ["pdf", "docx"]
+  rubric           String? // JSON rubric for grading
+  status           String    @default("DRAFT") // DRAFT, PUBLISHED, CLOSED
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  lesson       CourseLesson?          @relation(fields: [lessonId], references: [id])
+  classSubject ClassSubject?          @relation(fields: [classSubjectId], references: [id])
+  createdBy    User                   @relation("AssignmentCreator", fields: [createdById], references: [id])
+  submissions  AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(cuid())
+  assignmentId String
+  studentId    String
+  enrollmentId String?
+  submittedAt  DateTime  @default(now())
+  content      String? // Text submission
+  fileUrl      String? // File submission URL
+  fileName     String?
+  isLate       Boolean   @default(false)
+  status       String    @default("SUBMITTED") // DRAFT, SUBMITTED, GRADED, RETURNED
+  score        Float?
+  maxScore     Float?
+  feedback     String?
+  gradedAt     DateTime?
+  gradedById   String?
+
+  // Relations
+  assignment Assignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User        @relation("AssignmentStudent", fields: [studentId], references: [id])
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
+}
+
+// ============================================
+// Discussion Forums
+// ============================================
+
+model DiscussionThread {
+  id             String   @id @default(cuid())
+  courseId       String?
+  classSubjectId String?
+  title          String
+  content        String
+  authorId       String
+  isPinned       Boolean  @default(false)
+  isLocked       Boolean  @default(false)
+  viewCount      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  course       Course?          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject?    @relation(fields: [classSubjectId], references: [id])
+  author       User             @relation("ThreadAuthor", fields: [authorId], references: [id])
+  posts        DiscussionPost[]
+}
+
+model DiscussionPost {
+  id        String   @id @default(cuid())
+  threadId  String
+  parentId  String? // For nested replies
+  content   String
+  authorId  String
+  isAnswer  Boolean  @default(false) // Marked as answer
+  upvotes   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  thread  DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  parent  DiscussionPost?  @relation("PostReplies", fields: [parentId], references: [id])
+  replies DiscussionPost[] @relation("PostReplies")
+  author  User             @relation("PostAuthor", fields: [authorId], references: [id])
+}
+
+// ============================================
+// Announcements
+// ============================================
+
+model CourseAnnouncement {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  content   String
+  authorId  String
+  isPinned  Boolean  @default(false)
+  sendEmail Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  author User   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+}
+
+// ============================================
+// Certificates
+// ============================================
+
+model Certificate {
+  id                String    @id @default(cuid())
+  courseId          String
+  studentId         String
+  certificateNumber String    @unique
+  issueDate         DateTime  @default(now())
+  expiryDate        DateTime?
+  grade             String?
+  score             Float?
+  templateId        String?
+  pdfUrl            String?
+  verificationUrl   String?
+  metadata          String? // JSON for additional data
+
+  // Relations
+  course     Course      @relation(fields: [courseId], references: [id])
+  student    User        @relation("StudentCertificates", fields: [studentId], references: [id])
+  enrollment Enrollment?
+}
+
+// ============================================
+// Pedagogic Document Generation
+// ============================================
+
+model SchemeOfWork {
+  id              String    @id @default(cuid())
+  syllabusId      String    @unique
+  academicYear    String
+  term            String
+  generatedById   String
+  weeklyPlans     String // JSON array of weekly breakdowns
+  totalWeeks      Int
+  status          String    @default("DRAFT") // DRAFT, APPROVED, ACTIVE
+  approvedById    String?
+  approvedAt      DateTime?
+  exportedFormats String? // JSON array: ["PDF", "DOCX"]
+  pdfUrl          String?
+  docxUrl         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  syllabus    Syllabus @relation(fields: [syllabusId], references: [id], onDelete: Cascade)
+  generatedBy User     @relation("SchemeGenerator", fields: [generatedById], references: [id])
+}
+
+model ProgressionRecord {
+  id               String   @id @default(cuid())
+  classSubjectId   String
+  weekNumber       Int
+  date             DateTime
+  plannedTopic     String
+  actualTopic      String?
+  periodsUsed      Int?
+  completionStatus String   @default("NOT_COVERED") // COMPLETED, PARTIAL, NOT_COVERED, AHEAD
+  remarks          String?
+  teacherId        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  teacher      User         @relation("ProgressionRecorder", fields: [teacherId], references: [id])
+}
+
+model GeneratedPresentation {
+  id           String   @id @default(cuid())
+  lessonPlanId String? // Link to a lesson plan
+  topicId      String? // Or link to syllabus topic
+  title        String
+  template     String   @default("DEFAULT")
+  slideCount   Int
+  slidesData   String // JSON array of slides
+  pptxUrl      String?
+  pdfUrl       String?
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  createdBy User @relation("PresentationCreator", fields: [createdById], references: [id])
+}
+
+model ExamPaper {
+  id            String   @id @default(cuid())
+  title         String
+  subject       String
+  classLevel    String
+  examType      String // SEQUENCE, TERM_EXAM, MOCK, GCE_PRACTICE
+  academicYear  String
+  term          String?
+  duration      Int // minutes
+  totalMarks    Int
+  sections      String // JSON array of sections with questions
+  instructions  String?
+  coverPage     String? // JSON for cover page details
+  markingScheme String? // JSON marking scheme
+  createdById   String
+  status        String   @default("DRAFT") // DRAFT, REVIEWED, APPROVED, PUBLISHED
+  docxUrl       String?
+  pdfUrl        String?
+  answerKeyUrl  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  createdBy User @relation("ExamPaperCreator", fields: [createdById], references: [id])
+}
+
+model QuestionBank {
+  id            String   @id @default(cuid())
+  subject       String
+  topic         String?
+  questionText  String
+  questionType  String // MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, etc.
+  options       String? // JSON for MCQ options
+  correctAnswer String?
+  explanation   String?
+  marks         Float    @default(1)
+  difficulty    String   @default("MEDIUM")
+  bloomLevel    String? // REMEMBER, UNDERSTAND, APPLY, ANALYZE, EVALUATE, CREATE
+  tags          String? // JSON array of tags
+  createdById   String
+  isPublic      Boolean  @default(false)
+  usageCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  createdBy User @relation("QuestionBankCreator", fields: [createdById], references: [id])
+}

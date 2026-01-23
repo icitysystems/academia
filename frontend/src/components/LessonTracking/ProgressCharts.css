@@ -1,0 +1,317 @@
+/* Progress Charts - Bar Type */
+.progress-charts {
+	background: white;
+	border-radius: 12px;
+	padding: 20px;
+}
+
+.progress-charts__title {
+	margin: 0 0 16px 0;
+	font-size: 1rem;
+	color: #333;
+}
+
+.progress-charts__bars {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.progress-charts__bar-item {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.progress-charts__bar-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.progress-charts__bar-label {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: #333;
+}
+
+.progress-charts__bar-value {
+	font-size: 0.75rem;
+	color: #666;
+}
+
+.progress-charts__bar-track {
+	height: 12px;
+	background: #e5e7eb;
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.progress-charts__bar-fill {
+	height: 100%;
+	border-radius: 6px;
+	transition: width 0.5s ease-out;
+}
+
+.progress-charts__bar-percentage {
+	font-size: 0.75rem;
+	color: #666;
+	text-align: right;
+}
+
+/* Progress Charts - Donut Type */
+.progress-charts--donut {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.progress-charts__donut-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	max-width: 220px;
+}
+
+.progress-charts__donut-svg {
+	width: 100%;
+	height: 100%;
+}
+
+.progress-charts__donut-segment {
+	transition: stroke-dasharray 0.5s ease-out;
+}
+
+.progress-charts__donut-total {
+	font-size: 28px;
+	font-weight: bold;
+	fill: #333;
+}
+
+.progress-charts__donut-label {
+	font-size: 14px;
+	fill: #666;
+}
+
+.progress-charts__legend {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 16px;
+	margin-top: 20px;
+}
+
+.progress-charts__legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.875rem;
+}
+
+.progress-charts__legend-dot {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+}
+
+.progress-charts__legend-label {
+	color: #555;
+}
+
+.progress-charts__legend-value {
+	font-weight: 600;
+	color: #333;
+}
+
+/* Teaching Methods Chart */
+.teaching-methods-chart {
+	background: white;
+	border-radius: 12px;
+	padding: 20px;
+}
+
+.teaching-methods-chart__title {
+	margin: 0 0 16px 0;
+	font-size: 1rem;
+	color: #333;
+}
+
+.teaching-methods-chart__summary {
+	display: flex;
+	justify-content: space-around;
+	padding: 16px 0;
+	margin-bottom: 20px;
+	background: #f9fafb;
+	border-radius: 8px;
+}
+
+.teaching-methods-chart__stat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.teaching-methods-chart__stat-value {
+	font-size: 1.5rem;
+	font-weight: bold;
+	color: #4f46e5;
+}
+
+.teaching-methods-chart__stat-label {
+	font-size: 0.75rem;
+	color: #666;
+	text-transform: uppercase;
+}
+
+.teaching-methods-chart__methods {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.teaching-methods-chart__method {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.teaching-methods-chart__method-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.teaching-methods-chart__method-icon {
+	font-size: 1.25rem;
+}
+
+.teaching-methods-chart__method-name {
+	flex: 1;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	color: #333;
+	text-transform: capitalize;
+}
+
+.teaching-methods-chart__method-count {
+	font-size: 0.875rem;
+	color: #666;
+}
+
+.teaching-methods-chart__method-bar {
+	height: 8px;
+	background: #e5e7eb;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.teaching-methods-chart__method-fill {
+	height: 100%;
+	border-radius: 4px;
+	transition: width 0.5s ease-out;
+}
+
+.teaching-methods-chart__method-hours {
+	font-size: 0.75rem;
+	color: #888;
+	text-align: right;
+}
+
+/* Weekly Progress Chart */
+.weekly-progress-chart {
+	background: white;
+	border-radius: 12px;
+	padding: 20px;
+}
+
+.weekly-progress-chart__title {
+	margin: 0 0 16px 0;
+	font-size: 1rem;
+	color: #333;
+}
+
+.weekly-progress-chart__legend {
+	display: flex;
+	justify-content: center;
+	gap: 24px;
+	margin-bottom: 20px;
+}
+
+.weekly-progress-chart__legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.875rem;
+	color: #666;
+}
+
+.weekly-progress-chart__legend-dot {
+	width: 12px;
+	height: 12px;
+	border-radius: 3px;
+}
+
+.weekly-progress-chart__chart {
+	display: flex;
+	justify-content: space-around;
+	align-items: flex-end;
+	height: 200px;
+	padding-top: 20px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.weekly-progress-chart__week {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+}
+
+.weekly-progress-chart__bars {
+	display: flex;
+	gap: 4px;
+	align-items: flex-end;
+	height: 160px;
+}
+
+.weekly-progress-chart__bar {
+	width: 20px;
+	border-radius: 4px 4px 0 0;
+	transition: height 0.5s ease-out;
+	min-height: 4px;
+}
+
+.weekly-progress-chart__bar--planned {
+	background: #e5e7eb;
+}
+
+.weekly-progress-chart__bar--completed {
+	background: #4f46e5;
+}
+
+.weekly-progress-chart__label {
+	font-size: 0.75rem;
+	color: #666;
+	white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+	.teaching-methods-chart__summary {
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.weekly-progress-chart__chart {
+		overflow-x: auto;
+		justify-content: flex-start;
+		gap: 16px;
+		padding: 20px 10px;
+	}
+
+	.progress-charts__legend {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

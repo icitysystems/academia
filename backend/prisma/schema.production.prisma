@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Identity Module
+// ============================================
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String?
+  name         String?
+  role         UserRole     @default(TEACHER)
+  preferences  Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  googleId     String?      @unique
+
+  templates         Template[]
+  annotations       Annotation[]
+  trainingSessions  TrainingSession[]
+  gradingJobs       GradingJob[]
+  auditLogs         AuditLog[]
+}
+
+enum UserRole {
+  TEACHER
+  ADMIN
+}
+
+// ============================================
+// Template & Asset Management
+// ============================================
+model Template {
+  id            String           @id @default(cuid())
+  name          String
+  description   String?
+  version       Int              @default(1)
+  imageUrl      String?
+  thumbnailUrl  String?
+  answerKeyUrl  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  createdById   String
+  createdBy     User             @relation(fields: [createdById], references: [id])
+
+  regions       TemplateRegion[]
+  sheets        AnswerSheet[]
+  annotations   Annotation[]
+  models        MLModel[]
+  gradingJobs   GradingJob[]
+}
+
+model TemplateRegion {
+  id           String       @id @default(cuid())
+  templateId   String
+  template     Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  label        String
+  questionType QuestionType
+  points       Float        @default(1)
+  
+  bboxX        Float
+  bboxY        Float
+  bboxWidth    Float
+  bboxHeight   Float
+  
+  orderIndex   Int          @default(0)
+  metadata     Json?
+  
+  createdAt    DateTime     @default(now())
+
+  questionLabels QuestionLabel[]
+  gradingResults GradingResult[]
+}
+
+enum QuestionType {
+  MCQ
+  SHORT_ANSWER
+  LONG_ANSWER
+  TRUE_FALSE
+  NUMERIC
+  DIAGRAM
+}
+
+// ============================================
+// Answer Sheets (Scanned Student Work)
+// ============================================
+model AnswerSheet {
+  id            String        @id @default(cuid())
+  templateId    String
+  template      Template      @relation(fields: [templateId], references: [id])
+  
+  studentId     String?
+  studentName   String?
+  
+  originalUrl   String
+  processedUrl  String?
+  thumbnailUrl  String?
+  
+  status        SheetStatus   @default(UPLOADED)
+  ocrData       Json?
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  annotations    Annotation[]
+  gradingResults GradingResult[]
+  pdfOutput      PDFOutput?
+}
+
+enum SheetStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  ANNOTATED
+  GRADED
+  REVIEWED
+  ERROR
+}
+
+// ============================================
+// Annotation UI (Training Input)
+// ============================================
+model Annotation {
+  id           String          @id @default(cuid())
+  sheetId      String
+  sheet        AnswerSheet     @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  templateId   String
+  template     Template        @relation(fields: [templateId], references: [id])
+  teacherId    String
+  teacher      User            @relation(fields: [teacherId], references: [id])
+  
+  strokes      Json?
+  comments     String?
+  
+  isTrainingData Boolean       @default(false)
+  
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  questionLabels QuestionLabel[]
+}
+
+model QuestionLabel {
+  id           String         @id @default(cuid())
+  annotationId String
+  annotation   Annotation     @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  regionId     String
+  region       TemplateRegion @relation(fields: [regionId], references: [id])
+  
+  correctness  Correctness
+  score        Float
+  confidence   Float?
+  comment      String?
+  
+  createdAt    DateTime       @default(now())
+}
+
+enum Correctness {
+  CORRECT
+  PARTIAL
+  INCORRECT
+  SKIPPED
+}
+
+// ============================================
+// ML Training & Models
+// ============================================
+model TrainingSession {
+  id           String      @id @default(cuid())
+  teacherId    String
+  teacher      User        @relation(fields: [teacherId], references: [id])
+  
+  status       JobStatus   @default(PENDING)
+  config       Json?
+  metrics      Json?
+  errorMessage String?
+  
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime    @default(now())
+
+  models       MLModel[]
+}
+
+model MLModel {
+  id              String          @id @default(cuid())
+  templateId      String
+  template        Template        @relation(fields: [templateId], references: [id])
+  trainingId      String?
+  training        TrainingSession? @relation(fields: [trainingId], references: [id])
+  
+  version         Int             @default(1)
+  artifactUrl     String
+  accuracy        Float?
+  metadata        Json?
+  
+  isActive        Boolean         @default(false)
+  
+  createdAt       DateTime        @default(now())
+
+  gradingJobs     GradingJob[]
+}
+
+// ============================================
+// Grading Engine
+// ============================================
+model GradingJob {
+  id           String         @id @default(cuid())
+  templateId   String
+  template     Template       @relation(fields: [templateId], references: [id])
+  modelId      String
+  model        MLModel        @relation(fields: [modelId], references: [id])
+  teacherId    String
+  teacher      User           @relation(fields: [teacherId], references: [id])
+  
+  status       JobStatus      @default(PENDING)
+  totalSheets  Int            @default(0)
+  processedSheets Int         @default(0)
+  errorMessage String?
+  
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+
+  results      GradingResult[]
+}
+
+model GradingResult {
+  id             String         @id @default(cuid())
+  jobId          String
+  job            GradingJob     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sheetId        String
+  sheet          AnswerSheet    @relation(fields: [sheetId], references: [id])
+  regionId       String
+  region         TemplateRegion @relation(fields: [regionId], references: [id])
+  
+  predictedCorrectness Correctness
+  confidence     Float
+  assignedScore  Float
+  explanation    String?
+  
+  needsReview    Boolean        @default(false)
+  reviewedAt     DateTime?
+  
+  createdAt      DateTime       @default(now())
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================
+// PDF Output & Print Management
+// ============================================
+model PDFOutput {
+  id           String       @id @default(cuid())
+  sheetId      String       @unique
+  sheet        AnswerSheet  @relation(fields: [sheetId], references: [id])
+  
+  pdfUrl       String
+  totalScore   Float
+  maxScore     Float
+  breakdown    Json?
+  
+  createdAt    DateTime     @default(now())
+
+  printJobs    PrintJob[]
+}
+
+model PrintJob {
+  id           String      @id @default(cuid())
+  pdfId        String
+  pdf          PDFOutput   @relation(fields: [pdfId], references: [id])
+  
+  printerName  String?
+  status       PrintStatus @default(QUEUED)
+  copies       Int         @default(1)
+  errorMessage String?
+  
+  queuedAt     DateTime    @default(now())
+  printedAt    DateTime?
+}
+
+enum PrintStatus {
+  QUEUED
+  PRINTING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================
+// Audit & Logging
+// ============================================
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  
+  action     String
+  entityType String?
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  
+  createdAt  DateTime @default(now())
+}

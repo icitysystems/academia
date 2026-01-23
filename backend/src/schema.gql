@@ -1,0 +1,2313 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type User {
+  id: ID!
+  email: String!
+  name: String
+  role: UserRole!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""User roles in the system"""
+enum UserRole {
+  TEACHER
+  ADMIN
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type AuthResponse {
+  user: User!
+  token: String!
+}
+
+type TemplateRegion {
+  id: ID!
+  templateId: String!
+  label: String!
+  questionType: String!
+  points: Float!
+  bboxX: Float!
+  bboxY: Float!
+  bboxWidth: Float!
+  bboxHeight: Float!
+  orderIndex: Int!
+  metadata: JSON
+  createdAt: DateTime!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type TemplateCounts {
+  sheets: Int!
+  annotations: Int!
+  models: Int
+}
+
+type Template {
+  id: ID!
+  name: String!
+  description: String
+  version: Int!
+  imageUrl: String
+  thumbnailUrl: String
+  answerKeyUrl: String
+  regions: [TemplateRegion!]!
+  createdBy: User!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  _count: TemplateCounts
+}
+
+type QuestionLabel {
+  id: ID!
+  annotationId: String!
+  regionId: String!
+  correctness: String!
+  score: Float!
+  confidence: Float
+  comment: String
+  region: TemplateRegion
+  createdAt: DateTime!
+}
+
+type Annotation {
+  id: ID!
+  sheetId: String!
+  templateId: String!
+  teacherId: String!
+  strokes: JSON
+  comments: String
+  isTrainingData: Boolean!
+  questionLabels: [QuestionLabel!]!
+  teacher: User
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AnnotationStats {
+  totalAnnotations: Int!
+  trainingAnnotations: Int!
+  labelDistribution: JSON!
+}
+
+type AnswerSheet {
+  id: ID!
+  templateId: String!
+  studentId: String
+  studentName: String
+  originalUrl: String!
+  processedUrl: String
+  thumbnailUrl: String
+  status: String!
+  ocrData: JSON
+  template: Template
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type BatchUploadResult {
+  total: Int!
+  successful: Int!
+  failed: Int!
+  results: JSON!
+}
+
+type SheetStatusCount {
+  status: String!
+  count: Int!
+}
+
+type MLModel {
+  id: ID!
+  templateId: String!
+  trainingId: String
+  version: Int!
+  artifactUrl: String!
+  accuracy: Float
+  metadata: JSON
+  isActive: Boolean!
+  createdAt: DateTime!
+}
+
+type TrainingSession {
+  id: ID!
+  teacherId: String!
+  status: String!
+  config: JSON
+  metrics: JSON
+  errorMessage: String
+  startedAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+  models: [MLModel!]
+}
+
+type TrainingStats {
+  totalSessions: Int!
+  completedSessions: Int!
+  trainingAnnotations: Int!
+  activeModel: MLModel
+  recentSessions: [TrainingSession!]!
+}
+
+type GradingJobCounts {
+  results: Int!
+}
+
+type GradingJob {
+  id: ID!
+  templateId: String!
+  modelId: String!
+  teacherId: String!
+  status: String!
+  totalSheets: Int!
+  processedSheets: Int!
+  errorMessage: String
+  startedAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+  model: MLModel
+  template: Template
+  _count: GradingJobCounts
+}
+
+type GradingResult {
+  id: ID!
+  jobId: String!
+  sheetId: String!
+  regionId: String!
+  predictedCorrectness: String!
+  confidence: Float!
+  assignedScore: Float!
+  explanation: String
+  needsReview: Boolean!
+  reviewedAt: DateTime
+  createdAt: DateTime!
+  region: TemplateRegion
+  sheet: AnswerSheet
+}
+
+type GradingStats {
+  totalJobs: Int!
+  totalResults: Int!
+  needsReview: Int!
+  reviewed: Int!
+  averageConfidence: Float!
+  scoreDistribution: JSON!
+}
+
+type ExamQuestion {
+  id: ID!
+  examPaperId: String!
+  questionNumber: Int!
+  questionText: String!
+  questionType: QuestionType!
+  marks: Float!
+  imageUrl: String
+  metadata: String
+  orderIndex: Int!
+  createdAt: DateTime!
+}
+
+"""Type of exam question"""
+enum QuestionType {
+  MCQ
+  SHORT_ANSWER
+  LONG_ANSWER
+  TRUE_FALSE
+  NUMERIC
+  ESSAY
+  DIAGRAM
+}
+
+type ExpectedResponse {
+  id: ID!
+  examPaperId: String!
+  questionId: String!
+  expectedAnswer: String!
+  markingScheme: String
+  keywords: String
+  isAIGenerated: Boolean!
+  alternativeAnswers: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AIProposedResponse {
+  questionId: String!
+  questionNumber: Float!
+  questionText: String!
+  proposedAnswer: String!
+  suggestedKeywords: String
+  markingScheme: String
+  confidence: Float!
+}
+
+type ProposedResponses {
+  examPaperId: String!
+  responses: [AIProposedResponse!]!
+}
+
+type ModerationSample {
+  id: ID!
+  examPaperId: String!
+  studentName: String
+  imageUrl: String!
+  totalScore: Float!
+  feedback: String
+  questionScores: String!
+  isVerified: Boolean!
+  createdAt: DateTime!
+}
+
+type CalibrationResult {
+  accuracy: Float!
+  averageDeviation: Float!
+  isCalibrated: Boolean!
+  message: String
+}
+
+type ExamPaperSetup {
+  id: ID!
+  title: String!
+  subject: String!
+  description: String
+  paperType: PaperType!
+  totalMarks: Float!
+  duration: Int
+  teacherId: String!
+  status: ExamPaperStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  questions: [ExamQuestion!]
+  expectedResponses: [ExpectedResponse!]
+  moderationSamples: [ModerationSample!]
+  questionCount: Int
+  submissionCount: Int
+}
+
+"""Type of paper being graded"""
+enum PaperType {
+  EXAM
+  TEST
+  QUIZ
+  ASSIGNMENT
+}
+
+"""Status of the exam paper setup"""
+enum ExamPaperStatus {
+  DRAFT
+  QUESTIONS_ADDED
+  RESPONSES_SET
+  MODERATION_READY
+  GRADING_ACTIVE
+  COMPLETED
+}
+
+type StudentExamSubmission {
+  id: ID!
+  examPaperId: String!
+  studentId: String
+  studentName: String!
+  studentEmail: String
+  imageUrl: String!
+  thumbnailUrl: String
+  status: SubmissionStatus!
+  totalScore: Float
+  percentage: Float
+  grade: String
+  feedback: String
+  gradedAt: DateTime
+  reviewedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  responses: [StudentResponse!]
+}
+
+"""Status of student submission"""
+enum SubmissionStatus {
+  UPLOADED
+  PROCESSING
+  GRADED
+  REVIEWED
+  ERROR
+}
+
+type StudentResponse {
+  id: ID!
+  submissionId: String!
+  questionId: String!
+  extractedAnswer: String
+  assignedScore: Float
+  maxScore: Float!
+  predictedCorrectness: CorrectnessLevel
+  confidence: Float
+  explanation: String
+  teacherOverride: Float
+  teacherComment: String
+  needsReview: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""Correctness level of an answer"""
+enum CorrectnessLevel {
+  CORRECT
+  PARTIAL
+  INCORRECT
+}
+
+type ExamGradingSession {
+  id: ID!
+  examPaperId: String!
+  status: String!
+  totalSubmissions: Int!
+  gradedSubmissions: Int!
+  reviewedSubmissions: Int!
+  calibrationAccuracy: Float
+  averageConfidence: Float
+  errorMessage: String
+  startedAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+}
+
+type GradingSummary {
+  totalSubmissions: Int!
+  gradedCount: Int!
+  reviewedCount: Int!
+  pendingReviewCount: Int!
+  averageScore: Float
+  highestScore: Float
+  lowestScore: Float
+  gradeDistribution: String
+}
+
+type PDFOutput {
+  id: ID!
+  sheetId: String!
+  pdfUrl: String!
+  totalScore: Float!
+  maxScore: Float!
+  breakdown: JSON
+  createdAt: DateTime!
+  sheet: AnswerSheet
+}
+
+type PrintJob {
+  id: ID!
+  pdfId: String!
+  printerName: String
+  status: String!
+  copies: Int!
+  errorMessage: String
+  queuedAt: DateTime!
+  printedAt: DateTime
+  pdf: PDFOutput
+}
+
+type BatchPDFResult {
+  total: Int!
+  successful: Int!
+  failed: Int!
+  results: JSON!
+}
+
+type ClassSummary {
+  templateId: ID!
+  templateName: String!
+  totalStudents: Int!
+  averageScore: Float!
+  highestScore: Float!
+  lowestScore: Float!
+  passRate: Float!
+  gradeDistribution: JSON!
+}
+
+type QuestionAnalysis {
+  regionId: ID!
+  label: String!
+  questionType: String!
+  totalAttempts: Int!
+  correctCount: Int!
+  partialCount: Int!
+  incorrectCount: Int!
+  averageScore: Float!
+  difficultyIndex: Float!
+}
+
+type StudentSheetResult {
+  sheetId: String!
+  templateName: String!
+  totalScore: Float!
+  maxScore: Float!
+  percentage: Float!
+  grade: String!
+  gradedAt: DateTime!
+}
+
+type StudentReport {
+  studentId: String!
+  studentName: String!
+  sheets: [StudentSheetResult!]!
+  overallAverage: Float!
+}
+
+type ScoreDistribution {
+  range: String!
+  count: Int!
+}
+
+type NewsletterSubscription {
+  id: ID!
+  email: String!
+  name: String
+  isActive: Boolean!
+  confirmedAt: DateTime
+  unsubscribedAt: DateTime
+  source: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type NewsletterStats {
+  totalSubscribers: Float!
+  activeSubscribers: Float!
+  unsubscribedCount: Float!
+  subscribersThisMonth: Float!
+}
+
+type Donation {
+  id: ID!
+  email: String!
+  name: String
+  amount: Int!
+  currency: String!
+  stripePaymentId: String
+  status: String!
+  message: String
+  isAnonymous: Boolean!
+  userId: String
+  createdAt: DateTime!
+  completedAt: DateTime
+}
+
+type SubscriptionPlan {
+  id: ID!
+  name: String!
+  description: String
+  tier: Int!
+  priceMonthly: Int!
+  priceYearly: Int
+  stripeProductId: String
+  features: JSON
+  maxTemplates: Int
+  maxSheetsPerMonth: Int
+  maxModelsPerTemplate: Int
+  maxStorageMB: Int
+  hasAdvancedAnalytics: Boolean!
+  hasAPIAccess: Boolean!
+  hasPrioritySupport: Boolean!
+  hasCustomBranding: Boolean!
+  hasTeamFeatures: Boolean!
+  discountPercentYearly: Int!
+  trialDays: Int!
+  priority: Int!
+  isActive: Boolean!
+  isPublic: Boolean!
+}
+
+type Subscription {
+  id: ID!
+  userId: String!
+  planId: String!
+  plan: SubscriptionPlan!
+  stripeSubscriptionId: String
+  status: String!
+  billingCycle: String!
+  currentPeriodStart: DateTime
+  currentPeriodEnd: DateTime
+  cancelAtPeriodEnd: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type UserEntitlements {
+  planName: String!
+  tier: Int!
+  maxTemplates: Int
+  maxSheetsPerMonth: Int
+  maxModelsPerTemplate: Int
+  maxStorageMB: Int
+  hasAdvancedAnalytics: Boolean!
+  hasAPIAccess: Boolean!
+  hasPrioritySupport: Boolean!
+  hasCustomBranding: Boolean!
+  hasTeamFeatures: Boolean!
+  currentPeriodEnd: DateTime
+  isTrialing: Boolean!
+}
+
+type PaymentIntent {
+  clientSecret: String!
+  paymentIntentId: String!
+  amount: Int!
+  currency: String!
+}
+
+type CheckoutSession {
+  sessionId: String!
+  url: String!
+}
+
+type DonationStats {
+  totalDonations: Int!
+  totalAmount: Float!
+  donationsThisMonth: Int!
+  amountThisMonth: Float!
+}
+
+type PlanRevenueBreakdown {
+  planName: String!
+  count: Int!
+}
+
+type SubscriptionStats {
+  totalSubscriptions: Int!
+  activeSubscriptions: Int!
+  trialingSubscriptions: Int!
+  canceledSubscriptions: Int!
+  monthlyRecurringRevenue: Float!
+  revenueByPlan: [PlanRevenueBreakdown!]!
+}
+
+type Subject {
+  id: ID!
+  name: String!
+  code: String
+  description: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type SyllabusTopic {
+  id: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+  learningOutcomes: [String!]
+  prerequisites: [ID!]
+  isCovered: Boolean!
+  lastTaught: DateTime
+  createdAt: DateTime!
+}
+
+type SyllabusChapter {
+  id: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+  topics: [SyllabusTopic!]
+  completionPercentage: Float
+  createdAt: DateTime!
+}
+
+type SyllabusUnit {
+  id: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+  chapters: [SyllabusChapter!]
+  completionPercentage: Float
+  createdAt: DateTime!
+}
+
+type Syllabus {
+  id: ID!
+  name: String!
+  description: String
+  documentUrl: String
+  isTemplate: Boolean!
+  templateSource: String
+  totalTopics: Int!
+  totalHours: Float!
+  units: [SyllabusUnit!]
+  completionPercentage: Float
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type LessonAttachment {
+  id: ID!
+  fileName: String!
+  fileUrl: String!
+  fileType: String!
+  fileSize: Int
+  createdAt: DateTime!
+}
+
+type LessonTopic {
+  id: ID!
+  topic: SyllabusTopic
+  createdAt: DateTime!
+}
+
+type School {
+  id: ID!
+  name: String!
+  location: String
+  address: String
+  phone: String
+  email: String
+  status: String!
+  teacherCount: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Class {
+  id: ID!
+  school: School
+  name: String!
+  gradeLevel: String!
+  section: String
+  academicYear: String!
+  term: String
+  studentCount: Int
+  schedule: JSON
+  status: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ClassSubject {
+  id: ID!
+  class: Class
+  subject: Subject
+  teacherId: ID!
+  totalHours: Float
+  weeklyHours: Float
+  startDate: DateTime
+  endDate: DateTime
+  syllabus: Syllabus
+  progressPercentage: Float
+  hoursCompleted: Float
+  lessonsCount: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Lesson {
+  id: ID!
+  class: Class
+  classSubject: ClassSubject
+  teacherId: ID!
+  date: DateTime!
+  duration: Float!
+  teachingMethod: String
+  materialsUsed: String
+  homeworkAssigned: String
+  notes: String
+  attendance: String
+  status: String!
+  topics: [LessonTopic!]
+  attachments: [LessonAttachment!]
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ProgressSummary {
+  classSubjectId: ID!
+  subjectName: String!
+  className: String!
+  totalTopics: Int!
+  coveredTopics: Int!
+  completionPercentage: Float!
+  totalHours: Float!
+  hoursCompleted: Float!
+  lessonsCount: Int!
+  averageDuration: Float!
+  onTrack: Boolean!
+  projectedCompletionDate: DateTime
+}
+
+type TeachingMethodDistribution {
+  method: TeachingMethod!
+  count: Int!
+  percentage: Float!
+  totalHours: Float!
+}
+
+enum TeachingMethod {
+  LECTURE
+  DEMONSTRATION
+  GROUP_WORK
+  LAB
+  ACTIVITY
+  DISCUSSION
+  ASSESSMENT
+}
+
+type DateRange {
+  start: DateTime!
+  end: DateTime!
+}
+
+type LessonReport {
+  dateRange: DateRange!
+  totalLessons: Int!
+  totalHours: Float!
+  classesTaught: Int!
+  subjectsTaught: Int!
+  topicsCovered: Int!
+  methodDistribution: [TeachingMethodDistribution!]!
+  progressSummaries: [ProgressSummary!]!
+}
+
+type DashboardSummary {
+  todayLessons: [Lesson!]!
+  upcomingLessons: [Lesson!]!
+  weekProgress: Float!
+  alertsCount: Int!
+  schoolsCount: Int!
+  classesCount: Int!
+  recentProgress: [ProgressSummary!]!
+}
+
+type CourseCategory {
+  id: ID!
+  name: String!
+  slug: String!
+  description: String
+  iconUrl: String
+  orderIndex: Int!
+  createdAt: DateTime!
+}
+
+type Course {
+  id: ID!
+  code: String!
+  title: String!
+  description: String
+  shortDescription: String
+  thumbnailUrl: String
+  bannerUrl: String
+  instructorId: String!
+  categoryId: String
+  category: CourseCategory
+  level: String!
+  language: String!
+  duration: Int
+  price: Int!
+  currency: String!
+  status: String!
+  isPublic: Boolean!
+  maxEnrollments: Int
+  startDate: DateTime
+  endDate: DateTime
+  prerequisites: String
+  learningOutcomes: String
+  syllabus: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  modules: [CourseModule!]
+}
+
+type CourseModule {
+  id: ID!
+  courseId: String!
+  title: String!
+  description: String
+  orderIndex: Int!
+  isPublished: Boolean!
+  unlockDate: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lessons: [CourseLesson!]
+}
+
+type CourseLesson {
+  id: ID!
+  moduleId: String!
+  title: String!
+  description: String
+  contentType: String!
+  contentUrl: String
+  contentText: String
+  duration: Int
+  orderIndex: Int!
+  isPublished: Boolean!
+  isFree: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Enrollment {
+  id: ID!
+  courseId: String!
+  studentId: String!
+  status: String!
+  enrolledAt: DateTime!
+  completedAt: DateTime
+  progress: Float!
+  lastAccessedAt: DateTime
+  certificateId: String
+  paymentId: String
+  amountPaid: Int
+  course: Course
+}
+
+type LessonProgress {
+  id: ID!
+  enrollmentId: String!
+  lessonId: String!
+  status: String!
+  progressPercent: Float!
+  timeSpent: Int!
+  completedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lesson: CourseLesson
+}
+
+type Certificate {
+  id: ID!
+  courseId: String!
+  studentId: String!
+  certificateNumber: String!
+  issueDate: DateTime!
+  expiryDate: DateTime
+  grade: String
+  score: Float
+  templateId: String
+  pdfUrl: String
+  verificationUrl: String
+  course: Course
+}
+
+type CourseAnnouncement {
+  id: ID!
+  courseId: String!
+  title: String!
+  content: String!
+  authorId: String!
+  isPinned: Boolean!
+  sendEmail: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type CoursesResponse {
+  courses: [Course!]!
+  total: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+type EnrollmentsResponse {
+  enrollments: [Enrollment!]!
+  total: Int!
+}
+
+type OnlineQuiz {
+  id: ID!
+  lessonId: String
+  classSubjectId: String
+  title: String!
+  description: String
+  instructions: String
+  createdById: String!
+  type: String!
+  totalMarks: Int!
+  passingMarks: Int
+  duration: Int
+  maxAttempts: Int!
+  shuffleQuestions: Boolean!
+  shuffleOptions: Boolean!
+  showResults: String!
+  showCorrectAnswers: Boolean!
+  showFeedback: Boolean!
+  availableFrom: DateTime
+  availableUntil: DateTime
+  accessCode: String
+  status: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  questions: [QuizQuestion!]
+  totalQuestions: Int
+}
+
+type QuizQuestion {
+  id: ID!
+  quizId: String!
+  type: String!
+  questionText: String!
+  questionMedia: String
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float!
+  negativeMarks: Float!
+  difficulty: String!
+  topic: String
+  orderIndex: Int!
+  isRequired: Boolean!
+  createdAt: DateTime!
+}
+
+type QuizAttempt {
+  id: ID!
+  quizId: String!
+  studentId: String!
+  enrollmentId: String
+  attemptNumber: Int!
+  status: String!
+  startedAt: DateTime!
+  submittedAt: DateTime
+  timeSpent: Int
+  totalScore: Float
+  maxScore: Float
+  percentage: Float
+  grade: String
+  passed: Boolean
+  feedback: String
+  gradedAt: DateTime
+  gradedById: String
+  quiz: OnlineQuiz
+  responses: [QuizResponse!]
+}
+
+type QuizResponse {
+  id: ID!
+  attemptId: String!
+  questionId: String!
+  response: String
+  isCorrect: Boolean
+  marksAwarded: Float
+  feedback: String
+  timeSpent: Int
+  flagged: Boolean!
+  answeredAt: DateTime!
+  question: QuizQuestion
+}
+
+type QuizListResult {
+  quizzes: [OnlineQuiz!]!
+  total: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+type QuizStats {
+  totalAttempts: Int!
+  totalPassed: Int!
+  averageScore: Float!
+  averageTimeSpent: Float!
+  passRate: Float!
+}
+
+type Assignment {
+  id: ID!
+  lessonId: String
+  classSubjectId: String
+  title: String!
+  description: String
+  instructions: String
+  createdById: String!
+  dueDate: DateTime
+  totalMarks: Int!
+  allowLate: Boolean!
+  latePenalty: Float!
+  maxFileSize: Int
+  allowedFileTypes: [String!]
+  rubric: String
+  status: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  submissions: [AssignmentSubmission!]
+  totalSubmissions: Int
+}
+
+type AssignmentSubmission {
+  id: ID!
+  assignmentId: String!
+  assignment: Assignment
+  studentId: String!
+  enrollmentId: String
+  submittedAt: DateTime!
+  content: String
+  fileUrl: String
+  fileName: String
+  isLate: Boolean!
+  status: String!
+  score: Float
+  maxScore: Float
+  feedback: String
+  gradedAt: DateTime
+  gradedById: String
+}
+
+type AssignmentStats {
+  totalAssigned: Int!
+  totalSubmitted: Int!
+  totalGraded: Int!
+  totalLate: Int!
+  averageScore: Float!
+  submissionRate: Float!
+}
+
+type AssignmentListResult {
+  assignments: [Assignment!]!
+  total: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+type SchemeOfWork {
+  id: ID!
+  syllabusId: String!
+  academicYear: String!
+  term: String!
+  generatedById: String!
+  weeklyPlans: String!
+  totalWeeks: Int!
+  status: String!
+  approvedById: String
+  approvedAt: DateTime
+  exportedFormats: [String!]
+  pdfUrl: String
+  docxUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ProgressionRecord {
+  id: ID!
+  classSubjectId: String!
+  weekNumber: Int!
+  date: DateTime!
+  plannedTopic: String!
+  actualTopic: String
+  periodsUsed: Int
+  completionStatus: String!
+  remarks: String
+  teacherId: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type GeneratedPresentation {
+  id: ID!
+  lessonPlanId: String
+  topicId: String
+  title: String!
+  template: String!
+  slideCount: Int!
+  slidesData: String!
+  pptxUrl: String
+  pdfUrl: String
+  createdById: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ExamPaper {
+  id: ID!
+  title: String!
+  subject: String!
+  classLevel: String!
+  examType: String!
+  academicYear: String!
+  term: String
+  duration: Int!
+  totalMarks: Int!
+  sections: String!
+  instructions: String
+  coverPage: String
+  markingScheme: String
+  createdById: String!
+  status: String!
+  docxUrl: String
+  pdfUrl: String
+  answerKeyUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type QuestionBankItem {
+  id: ID!
+  subject: String!
+  topic: String
+  questionText: String!
+  questionType: String!
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float!
+  difficulty: String!
+  bloomLevel: String
+  tags: [String!]
+  createdById: String!
+  isPublic: Boolean!
+  usageCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ExamPaperList {
+  items: [ExamPaper!]!
+  total: Int!
+}
+
+type QuestionBankList {
+  items: [QuestionBankItem!]!
+  total: Int!
+}
+
+type Query {
+  me: User!
+  hello: String!
+  templates: [Template!]!
+  template(id: ID!): Template!
+  annotations(templateId: ID): [Annotation!]!
+  annotation(id: ID!): Annotation!
+  sheetAnnotations(sheetId: ID!): [Annotation!]!
+  trainingData(templateId: ID!): [Annotation!]!
+  annotationStats(templateId: ID!): AnnotationStats!
+  sheets(templateId: ID, status: String): [AnswerSheet!]!
+  sheet(id: ID!): AnswerSheet!
+  sheetsByStatus(templateId: ID!): [SheetStatusCount!]!
+  trainingSessions(templateId: ID): [TrainingSession!]!
+  trainingSession(id: ID!): TrainingSession
+  models(templateId: ID!): [MLModel!]!
+  activeModel(templateId: ID!): MLModel
+  trainingStats(templateId: ID!): TrainingStats!
+  gradingJob(id: ID!): GradingJob!
+  gradingJobs(templateId: ID): [GradingJob!]!
+  sheetGradingResults(sheetId: ID!): [GradingResult!]!
+  resultsNeedingReview(templateId: ID!): [GradingResult!]!
+  gradingStats(templateId: ID!): GradingStats!
+  examPaper(id: String!): ExamPaper
+  examPapers(filter: ExamPaperFilterInput): ExamPaperList!
+  requestAIProposedResponses(input: RequestAIProposalInput!): ProposedResponses!
+  moderationSamples(examPaperId: ID!): [ModerationSample!]!
+  studentSubmissions(examPaperId: ID!, status: String): [StudentExamSubmission!]!
+  examGradingSummary(examPaperId: ID!): GradingSummary!
+  sheetPDF(sheetId: ID!): PDFOutput
+  templatePDFs(templateId: ID!): [PDFOutput!]!
+  printJobs(status: String): [PrintJob!]!
+  classSummary(templateId: ID!): ClassSummary!
+  questionAnalysis(templateId: ID!): [QuestionAnalysis!]!
+  studentReport(studentId: String!): StudentReport!
+  exportResultsCSV(templateId: ID!): String!
+  scoreDistribution(templateId: ID!): [ScoreDistribution!]!
+  newsletterSubscriptions(activeOnly: Boolean! = true): [NewsletterSubscription!]!
+  newsletterStats: NewsletterStats!
+  checkNewsletterSubscription(email: String!): NewsletterSubscription
+  publicDonations(limit: Float! = 10): [Donation!]!
+  donations(limit: Float! = 50): [Donation!]!
+  donationStats: DonationStats!
+  subscriptionPlans(includeInactive: Boolean! = false): [SubscriptionPlan!]!
+  allSubscriptionPlans: [SubscriptionPlan!]!
+  subscriptionPlan(id: String!): SubscriptionPlan!
+  subscriptionStats: SubscriptionStats!
+  mySubscription: Subscription
+  mySubscriptions: [Subscription!]!
+  myEntitlements: UserEntitlements!
+  schools(status: SchoolStatus): [School!]!
+  school(id: ID!): School
+  mySchools: [School!]!
+  classes(schoolId: ID, status: ClassStatus): [Class!]!
+  class(id: ID!): Class
+  myClasses: [Class!]!
+  subjects(search: String): [Subject!]!
+  subject(id: ID!): Subject
+  classSubject(id: ID!): ClassSubject
+  classSubjects(classId: ID, teacherId: ID): [ClassSubject!]!
+  syllabus(id: ID!): Syllabus
+  syllabusTemplates(templateSource: String): [Syllabus!]!
+  lesson(id: ID!): Lesson
+  lessons(classId: ID, classSubjectId: ID, teacherId: ID, dateFrom: DateTime, dateTo: DateTime, status: LessonStatus): [Lesson!]!
+  progressSummary(classSubjectId: ID!): ProgressSummary!
+  lessonReport(input: GenerateReportInput!): LessonReport!
+  dashboardSummary: DashboardSummary!
+  courses(filter: CoursesFilterInput): CoursesResponse!
+  course(id: ID!): Course!
+  courseCategories: [CourseCategory!]!
+  courseAnnouncements(courseId: ID!): [CourseAnnouncement!]!
+  myCourses: [Course!]!
+  myEnrollment(courseId: ID!): Enrollment
+  myEnrollments: EnrollmentsResponse!
+  myCertificates: [Certificate!]!
+  quiz(id: String!): OnlineQuiz!
+  quizzes(filter: QuizFilterInput): QuizListResult!
+  myQuizzes(filter: QuizFilterInput): QuizListResult!
+  attempt(id: String!): QuizAttempt!
+  myAttempts(quizId: String): [QuizAttempt!]!
+  quizAttempts(quizId: String!): [QuizAttempt!]!
+  quizStats(quizId: String!): QuizStats!
+  assignment(id: String!): Assignment!
+  assignments(filter: AssignmentFilterInput): AssignmentListResult!
+  myAssignments: [Assignment!]!
+  submission(id: String!): AssignmentSubmission!
+  assignmentSubmissions(assignmentId: String!): [AssignmentSubmission!]!
+  mySubmissions: [AssignmentSubmission!]!
+  assignmentStats(assignmentId: String!): AssignmentStats!
+  schemeOfWork(id: String!): SchemeOfWork
+  schemeOfWorkBySyllabus(syllabusId: String!): SchemeOfWork
+  progressionRecords(classSubjectId: String!, teacherId: String): [ProgressionRecord!]!
+  presentation(id: String!): GeneratedPresentation
+  myPresentations: [GeneratedPresentation!]!
+  myExamPapers(filter: ExamPaperFilterInput): ExamPaperList!
+  question(id: String!): QuestionBankItem
+  questions(filter: QuestionFilterInput): QuestionBankList!
+  publicQuestions(filter: QuestionFilterInput): QuestionBankList!
+}
+
+input ExamPaperFilterInput {
+  subject: String
+  classLevel: String
+  examType: String
+  academicYear: String
+  status: String
+  page: Int = 1
+  pageSize: Int = 10
+}
+
+input RequestAIProposalInput {
+  examPaperId: ID!
+  style: String = "academic"
+}
+
+enum SchoolStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum LessonStatus {
+  PLANNED
+  COMPLETED
+  IN_PROGRESS
+  SKIPPED
+  RESCHEDULED
+}
+
+input GenerateReportInput {
+  teacherId: ID
+  schoolId: ID
+  classId: ID
+  subjectId: ID
+  dateFrom: DateTime!
+  dateTo: DateTime!
+}
+
+input CoursesFilterInput {
+  search: String
+  categoryId: String
+  level: String
+  instructorId: String
+  minPrice: Int
+  maxPrice: Int
+  language: String
+  page: Int! = 1
+  pageSize: Int! = 20
+}
+
+input QuizFilterInput {
+  classSubjectId: String
+  lessonId: String
+  type: String
+  status: String
+  search: String
+  page: Int = 1
+  pageSize: Int = 10
+}
+
+input AssignmentFilterInput {
+  search: String
+  classSubjectId: String
+  status: String
+  page: Int! = 1
+  pageSize: Int! = 20
+}
+
+input QuestionFilterInput {
+  subject: String
+  topic: String
+  questionType: String
+  difficulty: String
+  bloomLevel: String
+  search: String
+  isPublic: Boolean
+  page: Int = 1
+  pageSize: Int = 10
+}
+
+type Mutation {
+  register(input: RegisterInput!): AuthResponse!
+  login(input: LoginInput!): AuthResponse!
+  googleLogin(input: GoogleLoginInput!): AuthResponse!
+  createTemplate(input: CreateTemplateInput!): Template!
+  updateTemplate(id: ID!, input: UpdateTemplateInput!): Template!
+  deleteTemplate(id: ID!): Template!
+  addTemplateRegion(templateId: ID!, input: CreateRegionInput!): TemplateRegion!
+  updateTemplateRegion(regionId: ID!, input: UpdateRegionInput!): TemplateRegion!
+  deleteTemplateRegion(regionId: ID!): TemplateRegion!
+  reorderTemplateRegions(templateId: ID!, regionIds: [ID!]!): [TemplateRegion!]!
+  createAnnotation(input: CreateAnnotationInput!): Annotation!
+  updateAnnotation(id: ID!, input: UpdateAnnotationInput!): Annotation!
+  deleteAnnotation(id: ID!): Annotation!
+  uploadSheet(input: UploadSheetInput!): AnswerSheet!
+  batchUploadSheets(input: BatchUploadInput!): BatchUploadResult!
+  deleteSheet(id: ID!): AnswerSheet!
+  reprocessSheet(id: ID!): AnswerSheet!
+  startTraining(input: StartTrainingInput!): TrainingSession!
+  setActiveModel(modelId: ID!, templateId: ID!): MLModel!
+  startGrading(input: StartGradingInput!): GradingJob!
+  reviewGradingResult(input: ReviewResultInput!): GradingResult!
+  createExamPaper(input: CreateExamPaperInput!): ExamPaper!
+  updateExamPaper(id: String!, input: UpdateExamPaperInput!): ExamPaper!
+  deleteExamPaper(id: String!): Boolean!
+  addExamQuestion(input: CreateExamQuestionInput!): ExamQuestion!
+  bulkAddExamQuestions(input: BulkCreateQuestionsInput!): [ExamQuestion!]!
+  updateExamQuestion(input: UpdateExamQuestionInput!): ExamQuestion!
+  deleteExamQuestion(id: ID!): ExamQuestion!
+  addExpectedResponse(input: CreateExpectedResponseInput!): ExpectedResponse!
+  bulkAddExpectedResponses(input: BulkExpectedResponseInput!): [ExpectedResponse!]!
+  acceptAIResponses(input: AcceptAIResponsesInput!): [ExpectedResponse!]!
+  addModerationSample(input: CreateModerationSampleInput!): ModerationSample!
+  verifyModerationSample(input: VerifyModerationSampleInput!): ModerationSample!
+  runCalibration(input: RunCalibrationInput!): CalibrationResult!
+  addStudentSubmission(input: CreateStudentSubmissionInput!): StudentExamSubmission!
+  bulkUploadSubmissions(input: BulkUploadSubmissionsInput!): [StudentExamSubmission!]!
+  startExamBatchGrading(input: StartBatchGradingInput!): ExamGradingSession!
+  reviewStudentResponse(input: ReviewResponseInput!): StudentResponse!
+  finalizeExamGrading(input: FinalizeGradingInput!): ExamPaperSetup!
+  generatePDF(input: GeneratePDFInput!): PDFOutput!
+  batchGeneratePDFs(sheetIds: [ID!]!, options: PDFOptionsInput): BatchPDFResult!
+  createPrintJob(pdfId: ID!, printerName: String, copies: Float = 1): PrintJob!
+  subscribeNewsletter(input: SubscribeNewsletterInput!): NewsletterSubscription!
+  unsubscribeNewsletter(input: UnsubscribeNewsletterInput!): NewsletterSubscription!
+  createDonation(input: CreateDonationInput!): PaymentIntent!
+  createDonationAuthenticated(input: CreateDonationInput!): PaymentIntent!
+  confirmDonation(paymentIntentId: String!): Donation!
+  createSubscriptionPlan(input: CreateSubscriptionPlanInput!): SubscriptionPlan!
+  updateSubscriptionPlan(id: String!, input: UpdateSubscriptionPlanInput!): SubscriptionPlan!
+  deleteSubscriptionPlan(id: String!): SubscriptionPlan!
+  createSubscription(input: CreateSubscriptionInput!): CheckoutSession!
+  cancelSubscription(input: CancelSubscriptionInput!): Subscription!
+  createSchool(input: CreateSchoolInput!): School!
+  updateSchool(id: ID!, input: UpdateSchoolInput!): School!
+  deleteSchool(id: ID!): Boolean!
+  addTeacherToSchool(schoolId: ID!, teacherId: ID!, isPrimary: Boolean): Boolean!
+  removeTeacherFromSchool(schoolId: ID!, teacherId: ID!): Boolean!
+  createClass(input: CreateClassInput!): Class!
+  updateClass(id: ID!, input: UpdateClassInput!): Class!
+  deleteClass(id: ID!): Boolean!
+  archiveClass(id: ID!): Class!
+  createSubject(input: CreateSubjectInput!): Subject!
+  updateSubject(id: ID!, input: UpdateSubjectInput!): Subject!
+  assignSubjectToClass(input: AssignSubjectInput!): ClassSubject!
+  updateClassSubject(id: ID!, input: UpdateClassSubjectInput!): ClassSubject!
+  removeSubjectFromClass(id: ID!): Boolean!
+  createSyllabus(input: CreateSyllabusInput!): Syllabus!
+  updateSyllabus(id: ID!, input: UpdateSyllabusInput!): Syllabus!
+  importSyllabusTemplate(classSubjectId: ID!, templateId: ID!): Syllabus!
+  createSyllabusUnit(input: CreateSyllabusUnitInput!): Syllabus!
+  createSyllabusChapter(input: CreateSyllabusChapterInput!): Syllabus!
+  createSyllabusTopic(input: CreateSyllabusTopicInput!): Syllabus!
+  createLesson(input: CreateLessonInput!): Lesson!
+  updateLesson(id: ID!, input: UpdateLessonInput!): Lesson!
+  deleteLesson(id: ID!): Boolean!
+  bulkCreateLessons(input: [CreateLessonInput!]!): [Lesson!]!
+  deleteLessonAttachment(id: ID!): Boolean!
+  addLessonAttachment(input: AddAttachmentInput!): LessonAttachment!
+  addLessonLink(input: AddLinkInput!): LessonAttachment!
+  exportLessonReport(input: ExportReportInput!): String!
+  createCourse(input: CreateCourseInput!): Course!
+  updateCourse(id: ID!, input: UpdateCourseInput!): Course!
+  publishCourse(id: ID!): Course!
+  deleteCourse(id: ID!): Boolean!
+  createModule(input: CreateModuleInput!): CourseModule!
+  deleteModule(id: ID!): Boolean!
+  createCourseLesson(input: CreateCourseLessonInput!): CourseLesson!
+  createAnnouncement(input: CreateAnnouncementInput!): CourseAnnouncement!
+  enrollInCourse(courseId: ID!): Enrollment!
+  updateLessonProgress(enrollmentId: ID!, input: UpdateProgressInput!): LessonProgress!
+  generateCertificate(enrollmentId: ID!): Certificate!
+  createQuiz(input: CreateQuizInput!): OnlineQuiz!
+  updateQuiz(id: String!, input: UpdateQuizInput!): OnlineQuiz!
+  deleteQuiz(id: String!): Boolean!
+  publishQuiz(id: String!): OnlineQuiz!
+  closeQuiz(id: String!): OnlineQuiz!
+  addQuizQuestion(input: CreateQuizQuestionInput!): QuizQuestion!
+  updateQuizQuestion(id: String!, input: UpdateQuizQuestionInput!): QuizQuestion!
+  deleteQuestion(id: String!): Boolean!
+  reorderQuestions(quizId: String!, questionIds: [String!]!): Boolean!
+  startAttempt(input: StartAttemptInput!): QuizAttempt!
+  submitResponse(input: SubmitResponseInput!): QuizResponse!
+  submitAttempt(input: SubmitAttemptInput!): QuizAttempt!
+  gradeAttempt(input: GradeAttemptInput!): QuizAttempt!
+  createAssignment(input: CreateAssignmentInput!): Assignment!
+  updateAssignment(id: String!, input: UpdateAssignmentInput!): Assignment!
+  deleteAssignment(id: String!): Boolean!
+  publishAssignment(id: String!): Assignment!
+  closeAssignment(id: String!): Assignment!
+  submitAssignment(input: SubmitAssignmentInput!): AssignmentSubmission!
+  gradeSubmission(input: GradeSubmissionInput!): AssignmentSubmission!
+  returnSubmission(id: String!): AssignmentSubmission!
+  generateSchemeOfWork(input: GenerateSchemeInput!): SchemeOfWork!
+  updateSchemeOfWork(id: String!, input: UpdateSchemeInput!): SchemeOfWork!
+  approveSchemeOfWork(input: ApproveSchemeInput!): SchemeOfWork!
+  deleteSchemeOfWork(id: String!): Boolean!
+  createProgressionRecord(input: CreateProgressionInput!): ProgressionRecord!
+  updateProgressionRecord(id: String!, input: UpdateProgressionInput!): ProgressionRecord!
+  generatePresentation(input: GeneratePresentationInput!): GeneratedPresentation!
+  updatePresentation(id: String!, input: UpdatePresentationInput!): GeneratedPresentation!
+  deletePresentation(id: String!): Boolean!
+  createQuestion(input: CreateQuestionInput!): QuestionBankItem!
+  updateQuestion(id: String!, input: UpdateQuestionInput!): QuestionBankItem!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String
+  role: String
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input GoogleLoginInput {
+  credential: String!
+}
+
+input CreateTemplateInput {
+  name: String!
+  description: String
+  imageUrl: String
+  answerKeyUrl: String
+  regions: [CreateRegionInput!]
+}
+
+input CreateRegionInput {
+  label: String!
+  questionType: String!
+  points: Float = 1
+  bboxX: Float!
+  bboxY: Float!
+  bboxWidth: Float!
+  bboxHeight: Float!
+  metadata: JSON
+}
+
+input UpdateTemplateInput {
+  name: String
+  description: String
+  imageUrl: String
+  answerKeyUrl: String
+  regions: [CreateRegionInput!]
+}
+
+input UpdateRegionInput {
+  label: String
+  questionType: String
+  points: Float = 1
+  bboxX: Float
+  bboxY: Float
+  bboxWidth: Float
+  bboxHeight: Float
+  metadata: JSON
+}
+
+input CreateAnnotationInput {
+  sheetId: ID!
+  strokes: JSON
+  comments: String
+  isTrainingData: Boolean = true
+  questionLabels: [QuestionLabelInput!]
+}
+
+input QuestionLabelInput {
+  regionId: ID!
+  correctness: String!
+  score: Float!
+  confidence: Float
+  comment: String
+}
+
+input UpdateAnnotationInput {
+  sheetId: ID
+  strokes: JSON
+  comments: String
+  isTrainingData: Boolean = true
+  questionLabels: [QuestionLabelInput!]
+}
+
+input UploadSheetInput {
+  templateId: ID!
+  imageData: String!
+  fileName: String
+  studentId: String
+  studentName: String
+}
+
+input BatchUploadInput {
+  templateId: ID!
+  sheets: [SheetInputItem!]!
+}
+
+input SheetInputItem {
+  imageData: String!
+  fileName: String
+  studentId: String
+  studentName: String
+}
+
+input StartTrainingInput {
+  templateId: ID!
+  config: TrainingConfigInput
+}
+
+input TrainingConfigInput {
+  epochs: Int = 10
+  learningRate: Float = 0.001
+  batchSize: Int = 32
+  validationSplit: Float = 0.2
+}
+
+input StartGradingInput {
+  templateId: ID!
+  sheetIds: [ID!]!
+}
+
+input ReviewResultInput {
+  resultId: ID!
+  assignedScore: Float
+  predictedCorrectness: String
+}
+
+input CreateExamPaperInput {
+  title: String!
+  subject: String!
+  classLevel: String!
+  examType: String!
+  academicYear: String!
+  term: String
+  duration: Int!
+  totalMarks: Int!
+  sections: String!
+  instructions: String
+  coverPage: String
+  markingScheme: String
+}
+
+input UpdateExamPaperInput {
+  title: String
+  subject: String
+  classLevel: String
+  examType: String
+  duration: Int
+  totalMarks: Int
+  sections: String
+  instructions: String
+  coverPage: String
+  markingScheme: String
+  status: String
+}
+
+input CreateExamQuestionInput {
+  examPaperId: ID!
+  questionNumber: Int!
+  questionText: String!
+  questionType: QuestionType!
+  marks: Float!
+  imageUrl: String
+  metadata: String
+}
+
+input BulkCreateQuestionsInput {
+  examPaperId: ID!
+  questions: [QuestionInput!]!
+}
+
+input QuestionInput {
+  questionNumber: Int!
+  questionText: String!
+  questionType: QuestionType!
+  marks: Float!
+  imageUrl: String
+  metadata: String
+}
+
+input UpdateExamQuestionInput {
+  id: ID!
+  questionText: String
+  questionType: QuestionType
+  marks: Float
+  imageUrl: String
+  metadata: String
+}
+
+input CreateExpectedResponseInput {
+  examPaperId: ID!
+  questionId: ID!
+  expectedAnswer: String!
+  markingScheme: String
+  keywords: String
+  alternativeAnswers: String
+}
+
+input BulkExpectedResponseInput {
+  examPaperId: ID!
+  responses: [ExpectedResponseItem!]!
+}
+
+input ExpectedResponseItem {
+  questionId: ID!
+  expectedAnswer: String!
+  markingScheme: String
+  keywords: String
+  alternativeAnswers: String
+}
+
+input AcceptAIResponsesInput {
+  examPaperId: ID!
+  questionIds: [ID!]
+}
+
+input CreateModerationSampleInput {
+  examPaperId: ID!
+  studentName: String
+  imageUrl: String!
+  totalScore: Float!
+  feedback: String
+  questionScores: String!
+}
+
+input VerifyModerationSampleInput {
+  id: ID!
+  isVerified: Boolean!
+}
+
+input RunCalibrationInput {
+  examPaperId: ID!
+}
+
+input CreateStudentSubmissionInput {
+  examPaperId: ID!
+  studentId: String
+  studentName: String!
+  studentEmail: String
+  imageUrl: String!
+  thumbnailUrl: String
+}
+
+input BulkUploadSubmissionsInput {
+  examPaperId: ID!
+  submissions: [StudentSubmissionItem!]!
+}
+
+input StudentSubmissionItem {
+  studentId: String
+  studentName: String!
+  studentEmail: String
+  imageUrl: String!
+  thumbnailUrl: String
+}
+
+input StartBatchGradingInput {
+  examPaperId: ID!
+  submissionIds: [ID!]
+}
+
+input ReviewResponseInput {
+  responseId: ID!
+  teacherOverride: Float
+  teacherComment: String
+  needsReview: Boolean
+}
+
+input FinalizeGradingInput {
+  examPaperId: ID!
+  publishResults: Boolean
+}
+
+input GeneratePDFInput {
+  sheetId: ID!
+  options: PDFOptionsInput
+}
+
+input PDFOptionsInput {
+  includeOverlay: Boolean = true
+  includeScoreBreakdown: Boolean = true
+  includeConfidence: Boolean = false
+  overlayColor: String = "#FF0000"
+  fontSize: Int = 12
+}
+
+input SubscribeNewsletterInput {
+  email: String!
+  name: String
+  source: String
+}
+
+input UnsubscribeNewsletterInput {
+  email: String!
+}
+
+input CreateDonationInput {
+  email: String!
+  name: String
+  amount: Int!
+  currency: String! = "usd"
+  message: String
+  isAnonymous: Boolean! = false
+}
+
+input CreateSubscriptionPlanInput {
+  name: String!
+  description: String
+  tier: Int! = 0
+  priceMonthly: Int!
+  priceYearly: Int
+  stripeProductId: String
+  features: [String!]
+  maxTemplates: Int
+  maxSheetsPerMonth: Int
+  maxModelsPerTemplate: Int
+  maxStorageMB: Int
+  hasAdvancedAnalytics: Boolean! = false
+  hasAPIAccess: Boolean! = false
+  hasPrioritySupport: Boolean! = false
+  hasCustomBranding: Boolean! = false
+  hasTeamFeatures: Boolean! = false
+  discountPercentYearly: Int! = 0
+  trialDays: Int! = 0
+  priority: Int! = 0
+  isPublic: Boolean! = true
+}
+
+input UpdateSubscriptionPlanInput {
+  name: String
+  description: String
+  tier: Int
+  priceMonthly: Int
+  priceYearly: Int
+  stripeProductId: String
+  features: [String!]
+  maxTemplates: Int
+  maxSheetsPerMonth: Int
+  maxModelsPerTemplate: Int
+  maxStorageMB: Int
+  hasAdvancedAnalytics: Boolean
+  hasAPIAccess: Boolean
+  hasPrioritySupport: Boolean
+  hasCustomBranding: Boolean
+  hasTeamFeatures: Boolean
+  discountPercentYearly: Int
+  trialDays: Int
+  priority: Int
+  isActive: Boolean
+  isPublic: Boolean
+}
+
+input CreateSubscriptionInput {
+  planId: String!
+  billingCycle: String! = "MONTHLY"
+}
+
+input CancelSubscriptionInput {
+  subscriptionId: String!
+  cancelAtPeriodEnd: Boolean! = true
+}
+
+input CreateSchoolInput {
+  name: String!
+  location: String
+  address: String
+  phone: String
+  email: String
+}
+
+input UpdateSchoolInput {
+  name: String
+  location: String
+  address: String
+  phone: String
+  email: String
+  status: SchoolStatus
+}
+
+input CreateClassInput {
+  schoolId: ID!
+  name: String!
+  gradeLevel: String!
+  section: String
+  academicYear: String!
+  term: String
+  studentCount: Int
+  schedule: JSON
+}
+
+input UpdateClassInput {
+  name: String
+  gradeLevel: String
+  section: String
+  academicYear: String
+  term: String
+  studentCount: Int
+  schedule: JSON
+  status: ClassStatus
+}
+
+input CreateSubjectInput {
+  name: String!
+  code: String
+  description: String
+}
+
+input UpdateSubjectInput {
+  name: String
+  code: String
+  description: String
+}
+
+input AssignSubjectInput {
+  classId: ID!
+  subjectId: ID!
+  teacherId: ID!
+  totalHours: Float
+  weeklyHours: Float
+  startDate: DateTime
+  endDate: DateTime
+}
+
+input UpdateClassSubjectInput {
+  totalHours: Float
+  weeklyHours: Float
+  startDate: DateTime
+  endDate: DateTime
+}
+
+input CreateSyllabusInput {
+  classSubjectId: ID!
+  name: String!
+  description: String
+  documentUrl: String
+  isTemplate: Boolean
+  templateSource: String
+}
+
+input UpdateSyllabusInput {
+  name: String
+  description: String
+  documentUrl: String
+}
+
+input CreateSyllabusUnitInput {
+  syllabusId: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+}
+
+input CreateSyllabusChapterInput {
+  unitId: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+}
+
+input CreateSyllabusTopicInput {
+  chapterId: ID!
+  title: String!
+  description: String
+  orderIndex: Int!
+  estimatedHours: Float
+  learningOutcomes: [String!]
+  prerequisites: [ID!]
+}
+
+input CreateLessonInput {
+  classId: ID!
+  classSubjectId: ID!
+  date: DateTime!
+  duration: Float!
+  teachingMethod: TeachingMethod
+  materialsUsed: [String!]
+  homeworkAssigned: String
+  notes: String
+  attendance: AttendanceInput
+  status: LessonStatus
+  topicIds: [ID!]!
+}
+
+input AttendanceInput {
+  present: Int!
+  total: Int!
+}
+
+input UpdateLessonInput {
+  date: DateTime
+  duration: Float
+  teachingMethod: TeachingMethod
+  materialsUsed: [String!]
+  homeworkAssigned: String
+  notes: String
+  attendance: AttendanceInput
+  status: LessonStatus
+  topicIds: [ID!]
+}
+
+input AddAttachmentInput {
+  lessonId: ID!
+  fileName: String!
+  fileUrl: String!
+  fileType: String!
+  fileSize: Int
+}
+
+input AddLinkInput {
+  lessonId: ID!
+  url: String!
+  title: String!
+}
+
+input ExportReportInput {
+  schoolId: ID
+  classId: ID
+  classSubjectId: ID
+  dateFrom: DateTime!
+  dateTo: DateTime!
+  format: ExportFormat!
+}
+
+"""Available export formats for reports"""
+enum ExportFormat {
+  PDF
+  EXCEL
+  CSV
+}
+
+input CreateCourseInput {
+  code: String!
+  title: String!
+  description: String
+  shortDescription: String
+  thumbnailUrl: String
+  bannerUrl: String
+  categoryId: String
+  level: String! = "BEGINNER"
+  language: String! = "en"
+  duration: Int
+  price: Int! = 0
+  currency: String! = "XAF"
+  isPublic: Boolean! = false
+  maxEnrollments: Int
+  startDate: DateTime
+  endDate: DateTime
+  prerequisites: String
+  learningOutcomes: String
+  syllabus: String
+}
+
+input UpdateCourseInput {
+  title: String
+  description: String
+  shortDescription: String
+  thumbnailUrl: String
+  bannerUrl: String
+  categoryId: String
+  level: String
+  status: String
+  language: String
+  duration: Int
+  price: Int
+  currency: String
+  isPublic: Boolean
+  maxEnrollments: Int
+  startDate: DateTime
+  endDate: DateTime
+  prerequisites: String
+  learningOutcomes: String
+  syllabus: String
+}
+
+input CreateModuleInput {
+  courseId: String!
+  title: String!
+  description: String
+  orderIndex: Int
+  isPublished: Boolean! = false
+  unlockDate: DateTime
+}
+
+input CreateCourseLessonInput {
+  moduleId: String!
+  title: String!
+  description: String
+  contentType: String! = "VIDEO"
+  contentUrl: String
+  contentText: String
+  duration: Int
+  orderIndex: Int
+  isPublished: Boolean! = false
+  isFree: Boolean! = false
+}
+
+input CreateAnnouncementInput {
+  courseId: String!
+  title: String!
+  content: String!
+  isPinned: Boolean! = false
+  sendEmail: Boolean! = false
+}
+
+input UpdateProgressInput {
+  lessonId: String!
+  progressPercent: Float! = 0
+  timeSpent: Int! = 0
+  isCompleted: Boolean! = false
+}
+
+input CreateQuizInput {
+  lessonId: String
+  classSubjectId: String
+  title: String!
+  description: String
+  instructions: String
+  type: String = "QUIZ"
+  totalMarks: Int!
+  passingMarks: Int
+  duration: Int
+  maxAttempts: Int = 1
+  shuffleQuestions: Boolean = false
+  shuffleOptions: Boolean = false
+  showResults: String = "IMMEDIATELY"
+  showCorrectAnswers: Boolean = true
+  showFeedback: Boolean = true
+  availableFrom: DateTime
+  availableUntil: DateTime
+  accessCode: String
+}
+
+input UpdateQuizInput {
+  title: String
+  description: String
+  instructions: String
+  type: String
+  totalMarks: Int
+  passingMarks: Int
+  duration: Int
+  maxAttempts: Int
+  shuffleQuestions: Boolean
+  shuffleOptions: Boolean
+  showResults: String
+  showCorrectAnswers: Boolean
+  showFeedback: Boolean
+  availableFrom: DateTime
+  availableUntil: DateTime
+  accessCode: String
+  status: String
+}
+
+input CreateQuizQuestionInput {
+  quizId: ID!
+  type: String!
+  questionText: String!
+  questionMedia: String
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float!
+  negativeMarks: Float = 0
+  difficulty: String = "MEDIUM"
+  topic: String
+  orderIndex: Int!
+  isRequired: Boolean = true
+}
+
+input UpdateQuizQuestionInput {
+  type: String
+  questionText: String
+  questionMedia: String
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float
+  negativeMarks: Float
+  difficulty: String
+  topic: String
+  orderIndex: Int
+  isRequired: Boolean
+}
+
+input StartAttemptInput {
+  quizId: ID!
+  accessCode: String
+  enrollmentId: String
+}
+
+input SubmitResponseInput {
+  attemptId: ID!
+  questionId: ID!
+  response: String
+  timeSpent: Int
+  flagged: Boolean
+}
+
+input SubmitAttemptInput {
+  attemptId: ID!
+}
+
+input GradeAttemptInput {
+  attemptId: ID!
+  feedback: String
+  manualGrades: [ManualGradeInput!]
+}
+
+input ManualGradeInput {
+  responseId: ID!
+  marksAwarded: Float!
+  feedback: String
+}
+
+input CreateAssignmentInput {
+  lessonId: String
+  classSubjectId: String
+  title: String!
+  description: String
+  instructions: String
+  dueDate: DateTime
+  totalMarks: Int! = 100
+  allowLate: Boolean! = false
+  latePenalty: Float! = 0
+  maxFileSize: Int
+  allowedFileTypes: [String!]
+  rubric: String
+}
+
+input UpdateAssignmentInput {
+  title: String
+  description: String
+  instructions: String
+  dueDate: DateTime
+  totalMarks: Int
+  allowLate: Boolean
+  latePenalty: Float
+  maxFileSize: Int
+  allowedFileTypes: [String!]
+  rubric: String
+  status: String
+}
+
+input SubmitAssignmentInput {
+  assignmentId: String!
+  enrollmentId: String
+  content: String
+  fileUrl: String
+  fileName: String
+}
+
+input GradeSubmissionInput {
+  submissionId: String!
+  score: Float!
+  feedback: String
+}
+
+input GenerateSchemeInput {
+  syllabusId: ID!
+  academicYear: String!
+  term: String!
+  totalWeeks: Int
+}
+
+input UpdateSchemeInput {
+  weeklyPlans: String
+  status: String
+}
+
+input ApproveSchemeInput {
+  schemeId: ID!
+}
+
+input CreateProgressionInput {
+  classSubjectId: ID!
+  weekNumber: Int!
+  date: DateTime!
+  plannedTopic: String!
+  actualTopic: String
+  periodsUsed: Int
+  completionStatus: String
+  remarks: String
+}
+
+input UpdateProgressionInput {
+  actualTopic: String
+  periodsUsed: Int
+  completionStatus: String
+  remarks: String
+}
+
+input GeneratePresentationInput {
+  lessonPlanId: ID
+  topicId: ID
+  title: String!
+  template: String
+}
+
+input UpdatePresentationInput {
+  title: String
+  slidesData: String
+}
+
+input CreateQuestionInput {
+  subject: String!
+  topic: String
+  questionText: String!
+  questionType: String!
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float = 1
+  difficulty: String = "MEDIUM"
+  bloomLevel: String
+  tags: [String!]
+  isPublic: Boolean = false
+}
+
+input UpdateQuestionInput {
+  questionText: String
+  options: String
+  correctAnswer: String
+  explanation: String
+  marks: Float
+  difficulty: String
+  bloomLevel: String
+  tags: [String!]
+  isPublic: Boolean
+}

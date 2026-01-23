@@ -1,0 +1,356 @@
+{
+ "Description": "Academia - Complete Infrastructure Stack",
+ "Resources": {
+  "AcademiaBucket4E34E34B": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "BucketName": "academia.icitysystems.org",
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "Academia"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/AcademiaBucket/Resource"
+   }
+  },
+  "AcademiaBucketPolicyE87E64E6": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "AcademiaBucket4E34E34B"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "CanonicalUser": {
+         "Fn::GetAtt": [
+          "OAIE1EFC67F",
+          "S3CanonicalUserId"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "AcademiaBucket4E34E34B",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "AcademiaBucket4E34E34B",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:GetObject",
+       "Effect": "Allow",
+       "Principal": {
+        "CanonicalUser": {
+         "Fn::GetAtt": [
+          "OAIE1EFC67F",
+          "S3CanonicalUserId"
+         ]
+        }
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AcademiaBucket4E34E34B",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/AcademiaBucket/Policy/Resource"
+   }
+  },
+  "OAIE1EFC67F": {
+   "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+   "Properties": {
+    "CloudFrontOriginAccessIdentityConfig": {
+     "Comment": "Academia Frontend OAI"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/OAI/Resource"
+   }
+  },
+  "AcademiaCertificate3874226A": {
+   "Type": "AWS::CertificateManager::Certificate",
+   "Properties": {
+    "DomainName": "academia.icitysystems.org",
+    "DomainValidationOptions": [
+     {
+      "DomainName": "academia.icitysystems.org",
+      "HostedZoneId": "Z09710361JD7BJM1J1G9D"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Name",
+      "Value": "AcademiaStack/AcademiaCertificate"
+     },
+     {
+      "Key": "Project",
+      "Value": "Academia"
+     }
+    ],
+    "ValidationMethod": "DNS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/AcademiaCertificate/Resource"
+   }
+  },
+  "AcademiaDistribution3CFD761A": {
+   "Type": "AWS::CloudFront::Distribution",
+   "Properties": {
+    "DistributionConfig": {
+     "Aliases": [
+      "academia.icitysystems.org"
+     ],
+     "CustomErrorResponses": [
+      {
+       "ErrorCachingMinTTL": 300,
+       "ErrorCode": 403,
+       "ResponseCode": 200,
+       "ResponsePagePath": "/index.html"
+      },
+      {
+       "ErrorCachingMinTTL": 300,
+       "ErrorCode": 404,
+       "ResponseCode": 200,
+       "ResponsePagePath": "/index.html"
+      }
+     ],
+     "DefaultCacheBehavior": {
+      "AllowedMethods": [
+       "GET",
+       "HEAD",
+       "OPTIONS"
+      ],
+      "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+      "Compress": true,
+      "TargetOriginId": "AcademiaStackAcademiaDistributionOrigin14221CCFB",
+      "ViewerProtocolPolicy": "redirect-to-https"
+     },
+     "DefaultRootObject": "index.html",
+     "Enabled": true,
+     "HttpVersion": "http2",
+     "IPV6Enabled": true,
+     "Origins": [
+      {
+       "DomainName": {
+        "Fn::GetAtt": [
+         "AcademiaBucket4E34E34B",
+         "RegionalDomainName"
+        ]
+       },
+       "Id": "AcademiaStackAcademiaDistributionOrigin14221CCFB",
+       "S3OriginConfig": {
+        "OriginAccessIdentity": {
+         "Fn::Join": [
+          "",
+          [
+           "origin-access-identity/cloudfront/",
+           {
+            "Ref": "OAIE1EFC67F"
+           }
+          ]
+         ]
+        }
+       }
+      }
+     ],
+     "ViewerCertificate": {
+      "AcmCertificateArn": {
+       "Ref": "AcademiaCertificate3874226A"
+      },
+      "MinimumProtocolVersion": "TLSv1.2_2021",
+      "SslSupportMethod": "sni-only"
+     }
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "Academia"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/AcademiaDistribution/Resource"
+   }
+  },
+  "AcademiaAliasRecordAD521D02": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "AliasTarget": {
+     "DNSName": {
+      "Fn::GetAtt": [
+       "AcademiaDistribution3CFD761A",
+       "DomainName"
+      ]
+     },
+     "HostedZoneId": {
+      "Fn::FindInMap": [
+       "AWSCloudFrontPartitionHostedZoneIdMap",
+       {
+        "Ref": "AWS::Partition"
+       },
+       "zoneId"
+      ]
+     }
+    },
+    "HostedZoneId": "Z09710361JD7BJM1J1G9D",
+    "Name": "icitysystems.org.",
+    "Type": "A"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/AcademiaAliasRecord/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/22MTWrDMBCFz5K9PE1t2n3qEuiipDgHKMpobCZ2JCONGorQ3Yvsgrvo6v3wvVdD3TSw3+l7qNCM1cQXSGfROCp9D58pNJBeIo4kqu3tr1vlw02M31u95qxwctH03lmBdPI8sD0gUghvhqywLIu2MMfC/Eu8chDPlyjsbMH/5qyQvHDPqIVu2uqBPKR265b/LWblXRR6aiAdOkLnTQFWdybJWXUUXPS4DN/1PLMdij1FmaNkZZ0huIaHr7qGx2fY766BufLRCt8IulV/AJ2uMg9IAQAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Mappings": {
+  "AWSCloudFrontPartitionHostedZoneIdMap": {
+   "aws": {
+    "zoneId": "Z2FDTNDATAQYW2"
+   },
+   "aws-cn": {
+    "zoneId": "Z3RFFRIM2A3IF5"
+   }
+  }
+ },
+ "Outputs": {
+  "BucketName": {
+   "Description": "S3 Bucket Name",
+   "Value": {
+    "Ref": "AcademiaBucket4E34E34B"
+   }
+  },
+  "DistributionId": {
+   "Description": "CloudFront Distribution ID",
+   "Value": {
+    "Ref": "AcademiaDistribution3CFD761A"
+   }
+  },
+  "DomainName": {
+   "Description": "Domain Name",
+   "Value": "academia.icitysystems.org"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

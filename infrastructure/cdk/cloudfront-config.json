@@ -1,0 +1,70 @@
+{
+    "CallerReference": "academia-https-2026-01-04",
+    "Aliases": {
+        "Quantity": 1,
+        "Items": ["academia.icitysystems.org"]
+    },
+    "DefaultRootObject": "index.html",
+    "Origins": {
+        "Quantity": 1,
+        "Items": [
+            {
+                "Id": "academia-s3-origin",
+                "DomainName": "academia.icitysystems.org.s3-website-us-east-1.amazonaws.com",
+                "CustomOriginConfig": {
+                    "HTTPPort": 80,
+                    "HTTPSPort": 443,
+                    "OriginProtocolPolicy": "http-only"
+                }
+            }
+        ]
+    },
+    "DefaultCacheBehavior": {
+        "TargetOriginId": "academia-s3-origin",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "AllowedMethods": {
+            "Quantity": 3,
+            "Items": ["GET", "HEAD", "OPTIONS"],
+            "CachedMethods": {
+                "Quantity": 2,
+                "Items": ["GET", "HEAD"]
+            }
+        },
+        "ForwardedValues": {
+            "QueryString": false,
+            "Cookies": {
+                "Forward": "none"
+            }
+        },
+        "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0
+        },
+        "MinTTL": 0,
+        "Compress": true
+    },
+    "Comment": "Academia HTTPS Distribution",
+    "Enabled": true,
+    "ViewerCertificate": {
+        "ACMCertificateArn": "arn:aws:acm:us-east-1:771643347382:certificate/602096e4-effa-4037-a3b4-7ac5ad393493",
+        "SSLSupportMethod": "sni-only",
+        "MinimumProtocolVersion": "TLSv1.2_2021"
+    },
+    "CustomErrorResponses": {
+        "Quantity": 2,
+        "Items": [
+            {
+                "ErrorCode": 403,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 300
+            },
+            {
+                "ErrorCode": 404,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 300
+            }
+        ]
+    }
+}

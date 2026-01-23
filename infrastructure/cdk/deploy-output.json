@@ -1,0 +1,20 @@
+{
+  "AcademiaBackendStack": {
+    "ApiGatewayUrl": "https://xf0rx54i8j.execute-api.us-east-1.amazonaws.com/prod/",
+    "ApiUrl": "https://xf0rx54i8j.execute-api.us-east-1.amazonaws.com/prod/",
+    "VpcId": "vpc-05aa178c6c774c374",
+    "DbEndpoint": "academiabackendstack-academiadatabase583b4003-wr2gdtsovrc1.cnpejzsnelnc.us-east-1.rds.amazonaws.com",
+    "DbSecretArn": "arn:aws:secretsmanager:us-east-1:771643347382:secret:academia/database/credentials-goMuWc",
+    "AssetsBucketName": "academia-assets-771643347382",
+    "ExportsOutputRefAcademiaApiEB0FBB3526983528": "xf0rx54i8j",
+    "LambdaFunctionArn": "arn:aws:lambda:us-east-1:771643347382:function:academia-backend",
+    "AcademiaApiEndpointB8FAB250": "https://xf0rx54i8j.execute-api.us-east-1.amazonaws.com/prod/",
+    "LambdaFunctionName": "academia-backend"
+  },
+  "AcademiaFrontendStack": {
+    "FrontendBucketName": "academia-frontend-771643347382",
+    "DistributionId": "EJ1K1K68Z4BR5",
+    "DistributionDomainName": "dmz6ps7m5ndyc.cloudfront.net",
+    "FrontendUrl": "https://dmz6ps7m5ndyc.cloudfront.net"
+  }
+}

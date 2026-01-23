@@ -1,0 +1,244 @@
+import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
+import { UseGuards } from "@nestjs/common";
+import { PrismaService } from "../prisma.service";
+import { UsersService } from "./users.service";
+import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import {
+	Roles,
+	FacultyOrAdmin,
+	AdminOnly,
+	StudentOrParent,
+} from "../common/decorators/roles.decorator";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { UserRole } from "../common/types";
+
+/**
+ * Users Resolver implementing role-based GraphQL endpoints
+ * as per Specification Sections 2A and 3A
+ */
+@Resolver()
+@UseGuards(GqlAuthGuard, RolesGuard)
+export class UsersResolver {
+	constructor(
+		private prisma: PrismaService,
+		private usersService: UsersService,
+	) {}
+
+	@Query(() => String)
+	hello() {
+		return "hello from backend";
+	}
+
+	// ============================
+	// User Profile (All Roles)
+	// ============================
+
+	@Query(() => Object, { name: "me" })
+	async getCurrentUser(@CurrentUser() user: any) {
+		return this.usersService.getUser(user.sub);
+	}
+
+	@Query(() => Object, { name: "user" })
+	async getUser(
+		@Args("id", { type: () => ID }) id: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.getUser(id);
+	}
+
+	// ============================
+	// Admin User Management (2A.3)
+	// ============================
+
+	@Query(() => Object, { name: "users" })
+	@Roles(UserRole.ADMIN)
+	async listUsers(
+		@CurrentUser() user: any,
+		@Args("role", { nullable: true }) role?: string,
+		@Args("isActive", { nullable: true }) isActive?: boolean,
+		@Args("search", { nullable: true }) search?: string,
+		@Args("skip", { type: () => Int, nullable: true }) skip?: number,
+		@Args("take", { type: () => Int, nullable: true }) take?: number,
+	) {
+		return this.usersService.listUsers(user.sub, {
+			role,
+			isActive,
+			search,
+			skip,
+			take,
+		});
+	}
+
+	@Mutation(() => Object, { name: "createUser" })
+	@Roles(UserRole.ADMIN)
+	async createUser(
+		@Args("email") email: string,
+		@Args("name", { nullable: true }) name: string,
+		@Args("role", { nullable: true }) role: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.createUser({ email, name, role }, user.sub);
+	}
+
+	@Mutation(() => Object, { name: "updateUser" })
+	async updateUser(
+		@Args("id", { type: () => ID }) id: string,
+		@Args("name", { nullable: true }) name: string,
+		@Args("phone", { nullable: true }) phone: string,
+		@Args("role", { nullable: true }) role: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.updateUser(id, { name, phone, role }, user.sub);
+	}
+
+	@Mutation(() => Object, { name: "deleteUser" })
+	@Roles(UserRole.ADMIN)
+	async deleteUser(
+		@Args("id", { type: () => ID }) id: string,
+		@Args("hardDelete", { nullable: true, defaultValue: false })
+		hardDelete: boolean,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.deleteUser(id, user.sub, hardDelete);
+	}
+
+	// ============================
+	// Student Dashboard (2A.1, 3A.1)
+	// ============================
+
+	@Query(() => Object, { name: "studentDashboard" })
+	@Roles(UserRole.STUDENT)
+	async getStudentDashboard(@CurrentUser() user: any) {
+		return this.usersService.getStudentDashboard(user.sub);
+	}
+
+	@Query(() => Object, { name: "studentGrades" })
+	@Roles(UserRole.STUDENT, UserRole.PARENT)
+	async getStudentGrades(
+		@CurrentUser() user: any,
+		@Args("studentId", { type: () => ID, nullable: true }) studentId?: string,
+	) {
+		// If parent viewing, use studentId; otherwise use own ID
+		const targetId = studentId || user.sub;
+		return this.usersService.getStudentGrades(targetId);
+	}
+
+	@Mutation(() => Object, { name: "requestTranscript" })
+	@Roles(UserRole.STUDENT)
+	async requestTranscript(
+		@Args("purpose", { nullable: true }) purpose: string,
+		@Args("copies", { type: () => Int, nullable: true }) copies: number,
+		@Args("deliveryMethod", { nullable: true }) deliveryMethod: string,
+		@Args("address", { nullable: true }) address: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.requestTranscript(user.sub, {
+			purpose,
+			copies,
+			deliveryMethod,
+			address,
+		});
+	}
+
+	// ============================
+	// Faculty Dashboard (2A.2, 3A.2)
+	// ============================
+
+	@Query(() => Object, { name: "facultyDashboard" })
+	@Roles(UserRole.FACULTY)
+	async getFacultyDashboard(@CurrentUser() user: any) {
+		return this.usersService.getFacultyDashboard(user.sub);
+	}
+
+	@Query(() => [Object], { name: "classRoster" })
+	@Roles(UserRole.FACULTY, UserRole.ADMIN)
+	async getClassRoster(
+		@Args("courseId", { type: () => ID }) courseId: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.getClassRoster(user.sub, courseId);
+	}
+
+	@Query(() => Object, { name: "studentProgress" })
+	@Roles(UserRole.FACULTY)
+	async trackStudentProgress(
+		@Args("studentId", { type: () => ID }) studentId: string,
+		@Args("courseId", { type: () => ID }) courseId: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.trackStudentProgress(
+			user.sub,
+			studentId,
+			courseId,
+		);
+	}
+
+	// ============================
+	// Admin Dashboard (2A.3, 3A.3)
+	// ============================
+
+	@Query(() => Object, { name: "adminDashboard" })
+	@Roles(UserRole.ADMIN)
+	async getAdminDashboard(@CurrentUser() user: any) {
+		return this.usersService.getAdminDashboard(user.sub);
+	}
+
+	@Query(() => Object, { name: "institutionalReport" })
+	@Roles(UserRole.ADMIN)
+	async generateInstitutionalReport(
+		@Args("reportType") reportType: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.generateInstitutionalReport(user.sub, reportType);
+	}
+
+	// ============================
+	// Support Staff (2A.4, 3A.4)
+	// ============================
+
+	@Query(() => Object, { name: "supportDashboard" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getSupportDashboard(@CurrentUser() user: any) {
+		return this.usersService.getSupportDashboard(user.sub);
+	}
+
+	@Mutation(() => Object, { name: "assignTicket" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async assignTicket(
+		@Args("ticketId", { type: () => ID }) ticketId: string,
+		@Args("assigneeId", { type: () => ID }) assigneeId: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.assignTicket(ticketId, assigneeId, user.sub);
+	}
+
+	@Mutation(() => Object, { name: "resolveTicket" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async resolveTicket(
+		@Args("ticketId", { type: () => ID }) ticketId: string,
+		@Args("resolution") resolution: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.resolveTicket(ticketId, resolution, user.sub);
+	}
+
+	// ============================
+	// Parent Dashboard (2A.5, 3A.5)
+	// ============================
+
+	@Query(() => Object, { name: "parentDashboard" })
+	@Roles(UserRole.PARENT)
+	async getParentDashboard(@CurrentUser() user: any) {
+		return this.usersService.getParentDashboard(user.sub);
+	}
+
+	@Query(() => Object, { name: "childProgress" })
+	@Roles(UserRole.PARENT)
+	async getStudentProgressForParent(
+		@Args("studentId", { type: () => ID }) studentId: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.getStudentProgressForParent(user.sub, studentId);
+	}
+}

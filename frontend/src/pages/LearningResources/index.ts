@@ -1,0 +1,10 @@
+export { default as LearningResourcesDashboard } from "./Dashboard";
+export { default as SyllabusGenerator } from "./SyllabusGenerator";
+export { default as LessonPlanGenerator } from "./LessonPlanGenerator";
+export { default as SchemesOfWork } from "./SchemesOfWork";
+export { default as TeachingResources } from "./TeachingResources";
+export { default as ExamPapers } from "./ExamPapers";
+export { default as QuestionBank } from "./QuestionBank";
+export { default as OnlineQuizzes } from "./OnlineQuizzes";
+export { default as Presentations } from "./Presentations";
+export { default as PerformanceAnalytics } from "./PerformanceAnalytics";
