@@ -1864,6 +1864,30 @@
    "Export": {
     "Name": "AcademiaBackendStack:ExportsOutputRefAcademiaApiEB0FBB3526983528"
    }
+  },
+  "ExportsOutputRefAcademiaVpc136B99B28EC642DB": {
+   "Value": {
+    "Ref": "AcademiaVpc136B99B2"
+   },
+   "Export": {
+    "Name": "AcademiaBackendStack:ExportsOutputRefAcademiaVpc136B99B28EC642DB"
+   }
+  },
+  "ExportsOutputRefBackendFunction63314140F8746164": {
+   "Value": {
+    "Ref": "BackendFunction63314140"
+   },
+   "Export": {
+    "Name": "AcademiaBackendStack:ExportsOutputRefBackendFunction63314140F8746164"
+   }
+  },
+  "ExportsOutputRefAcademiaDatabase583B400399DBD937": {
+   "Value": {
+    "Ref": "AcademiaDatabase583B4003"
+   },
+   "Export": {
+    "Name": "AcademiaBackendStack:ExportsOutputRefAcademiaDatabase583B400399DBD937"
+   }
   }
  },
  "Parameters": {

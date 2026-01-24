@@ -33,6 +33,14 @@ model User {
   lastLoginAt      DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  
+  // Password Reset Fields
+  passwordResetToken      String?
+  passwordResetExpiry     DateTime?
+  
+  // Email Verification Fields
+  emailVerificationToken  String?
+  emailVerificationExpiry DateTime?
 
   // Relations
   templates        Template[]

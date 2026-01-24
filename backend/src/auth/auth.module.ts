@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthService } from "./auth.service";
 import { AuthResolver } from "./auth.resolver";
 import { JwtStrategy } from "./jwt.strategy";
+import { EmailService } from "./email.service";
 import { PrismaService } from "../prisma.service";
 
 @Module({
@@ -21,7 +22,13 @@ import { PrismaService } from "../prisma.service";
 			inject: [ConfigService],
 		}),
 	],
-	providers: [AuthService, AuthResolver, JwtStrategy, PrismaService],
-	exports: [AuthService, JwtModule],
+	providers: [
+		AuthService,
+		AuthResolver,
+		JwtStrategy,
+		EmailService,
+		PrismaService,
+	],
+	exports: [AuthService, EmailService, JwtModule],
 })
 export class AuthModule {}

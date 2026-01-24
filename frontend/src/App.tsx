@@ -9,6 +9,9 @@ import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import TemplatesPage from './pages/TemplatesPage';
 import TemplateDetailPage from './pages/TemplateDetailPage';
 import ReportsPage from './pages/ReportsPage';
@@ -20,6 +23,7 @@ import PricingPage from './pages/PricingPage';
 import SubscriptionSuccessPage from './pages/SubscriptionSuccessPage';
 import SubscriptionPlansAdmin from './pages/admin/SubscriptionPlansAdmin';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import SupportDashboard from './pages/admin/SupportDashboard';
 
 // Lesson Tracking Pages
 import Dashboard from './pages/LessonTracking/Dashboard';
@@ -209,6 +213,9 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           
           {/* Protected Routes */}
           <Route
@@ -649,6 +656,22 @@ const AppContent: React.FC = () => {
               <AdminRoute>
                 <SubscriptionPlansAdmin />
               </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/support"
+            element={
+              <AdminRoute>
+                <SupportDashboard />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <ProtectedRoute>
+                <SupportDashboard />
+              </ProtectedRoute>
             }
           />
           

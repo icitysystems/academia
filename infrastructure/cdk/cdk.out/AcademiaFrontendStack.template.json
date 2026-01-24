@@ -355,6 +355,14 @@
    "Value": {
     "Ref": "FrontendBucketEFE2E19C"
    }
+  },
+  "ExportsOutputRefDistribution830FAC524DF81588": {
+   "Value": {
+    "Ref": "Distribution830FAC52"
+   },
+   "Export": {
+    "Name": "AcademiaFrontendStack:ExportsOutputRefDistribution830FAC524DF81588"
+   }
   }
  },
  "Parameters": {

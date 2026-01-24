@@ -10,6 +10,7 @@ import {
   Box,
   Alert,
   Link,
+  Divider,
 } from '@mui/material';
 import { LOGIN } from '../graphql/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -73,6 +74,11 @@ const LoginPage: React.FC = () => {
             margin="normal"
             required
           />
+          <Box sx={{ textAlign: 'right', mt: 1 }}>
+            <Link component={RouterLink} to="/forgot-password" variant="body2">
+              Forgot password?
+            </Link>
+          </Box>
           <Button
             type="submit"
             fullWidth
@@ -85,7 +91,9 @@ const LoginPage: React.FC = () => {
           </Button>
         </Box>
 
-        <Typography align="center" sx={{ mt: 2 }}>
+        <Divider sx={{ my: 3 }} />
+
+        <Typography align="center">
           Don't have an account?{' '}
           <Link component={RouterLink} to="/register">
             Register

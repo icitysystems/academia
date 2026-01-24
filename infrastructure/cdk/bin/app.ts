@@ -3,6 +3,7 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { AcademiaBackendLambdaStack } from "../lib/academia-backend-lambda-stack";
 import { AcademiaFrontendStack } from "../lib/frontend-stack";
+import { AcademiaMonitoringStack } from "../lib/monitoring-stack";
 
 const app = new cdk.App();
 
@@ -14,6 +15,7 @@ const env = {
 const domainName = "icitysystems.org";
 const subdomain = "academia";
 const hostedZoneId = app.node.tryGetContext("hostedZoneId") || undefined;
+const alertEmail = app.node.tryGetContext("alertEmail") || undefined;
 
 // Backend Infrastructure Stack - VPC, RDS, Lambda, S3
 const backendStack = new AcademiaBackendLambdaStack(
@@ -38,6 +40,26 @@ const frontendStack = new AcademiaFrontendStack(app, "AcademiaFrontendStack", {
 	description: "Academia Frontend on S3 + CloudFront",
 });
 frontendStack.addDependency(backendStack);
+
+// Monitoring Stack - CloudWatch Alarms, VPC Flow Logs, Dashboard
+const monitoringStack = new AcademiaMonitoringStack(
+	app,
+	"AcademiaMonitoringStack",
+	{
+		env,
+		vpc: backendStack.vpc,
+		lambdaFunctionName: backendStack.lambdaFunctionName,
+		databaseIdentifier: backendStack.databaseIdentifier,
+		apiGatewayName: backendStack.apiGatewayName,
+		distributionId: frontendStack.distributionId,
+		assetsBucketName: backendStack.assetsBucket.bucketName,
+		alertEmail,
+		description:
+			"Academia Production Monitoring (CloudWatch, Alarms, VPC Flow Logs)",
+	},
+);
+monitoringStack.addDependency(backendStack);
+monitoringStack.addDependency(frontendStack);
 
 // Tags
 cdk.Tags.of(app).add("Project", "Academia");

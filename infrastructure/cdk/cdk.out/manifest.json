@@ -23,7 +23,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/4b2e06d2974f18b3d2c1f231b1cac1c0f2104453748d553c78b3f640ba62914a.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/dcd3bd6620bc8ccad3c309d179311017a67b1803cd771ac19240adf336eb908d.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -430,6 +430,24 @@
             "data": "ExportsOutputRefAcademiaApiEB0FBB3526983528"
           }
         ],
+        "/AcademiaBackendStack/Exports/Output{\"Ref\":\"AcademiaVpc136B99B2\"}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportsOutputRefAcademiaVpc136B99B28EC642DB"
+          }
+        ],
+        "/AcademiaBackendStack/Exports/Output{\"Ref\":\"BackendFunction63314140\"}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportsOutputRefBackendFunction63314140F8746164"
+          }
+        ],
+        "/AcademiaBackendStack/Exports/Output{\"Ref\":\"AcademiaDatabase583B4003\"}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportsOutputRefAcademiaDatabase583B400399DBD937"
+          }
+        ],
         "/AcademiaBackendStack/BootstrapVersion": [
           {
             "type": "aws:cdk:logicalId",
@@ -467,7 +485,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/d9d7874aa4356c3b802dc74f01a493e90449154fc38541acf0761615c4c26168.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/5c9165946549379e1670cf4c97246b17b60f9dfbddc52faed9e07072b6488863.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -557,6 +575,12 @@
             "data": "CDKMetadata"
           }
         ],
+        "/AcademiaFrontendStack/Exports/Output{\"Ref\":\"Distribution830FAC52\"}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportsOutputRefDistribution830FAC524DF81588"
+          }
+        ],
         "/AcademiaFrontendStack/BootstrapVersion": [
           {
             "type": "aws:cdk:logicalId",
@@ -571,6 +595,236 @@
         ]
       },
       "displayName": "AcademiaFrontendStack"
+    },
+    "AcademiaMonitoringStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "AcademiaMonitoringStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "AcademiaMonitoringStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/us-east-1",
+      "properties": {
+        "templateFile": "AcademiaMonitoringStack.template.json",
+        "terminationProtection": false,
+        "tags": {
+          "Environment": "Production",
+          "ManagedBy": "CDK",
+          "Project": "Academia"
+        },
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-us-east-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-us-east-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/bf61efb37741bd6c29b6fb2c217fb648220e6441e3d80b1f9614fce09c673cbb.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "AcademiaMonitoringStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-us-east-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "AcademiaBackendStack",
+        "AcademiaFrontendStack",
+        "AcademiaMonitoringStack.assets"
+      ],
+      "metadata": {
+        "/AcademiaMonitoringStack": [
+          {
+            "type": "aws:cdk:stack-tags",
+            "data": [
+              {
+                "Key": "Environment",
+                "Value": "Production"
+              },
+              {
+                "Key": "ManagedBy",
+                "Value": "CDK"
+              },
+              {
+                "Key": "Project",
+                "Value": "Academia"
+              }
+            ]
+          }
+        ],
+        "/AcademiaMonitoringStack/AlarmTopic/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AlarmTopicD01E77F9"
+          }
+        ],
+        "/AcademiaMonitoringStack/VpcFlowLogsGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "VpcFlowLogsGroupC5F6A8C5"
+          }
+        ],
+        "/AcademiaMonitoringStack/VpcFlowLogsRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "VpcFlowLogsRole6B344965"
+          }
+        ],
+        "/AcademiaMonitoringStack/VpcFlowLogsRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "VpcFlowLogsRoleDefaultPolicy9C8CF3FB"
+          }
+        ],
+        "/AcademiaMonitoringStack/VpcFlowLog": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "VpcFlowLog"
+          }
+        ],
+        "/AcademiaMonitoringStack/LambdaErrorsAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LambdaErrorsAlarm8ED74A7D"
+          }
+        ],
+        "/AcademiaMonitoringStack/LambdaDurationAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LambdaDurationAlarmA8007F1F"
+          }
+        ],
+        "/AcademiaMonitoringStack/LambdaThrottlesAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LambdaThrottlesAlarm13DE03A1"
+          }
+        ],
+        "/AcademiaMonitoringStack/LambdaConcurrencyAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LambdaConcurrencyAlarm801E48EA"
+          }
+        ],
+        "/AcademiaMonitoringStack/RdsCpuAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RdsCpuAlarm29EF1690"
+          }
+        ],
+        "/AcademiaMonitoringStack/RdsStorageAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RdsStorageAlarm879B47F1"
+          }
+        ],
+        "/AcademiaMonitoringStack/RdsConnectionsAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RdsConnectionsAlarm2CE1E130"
+          }
+        ],
+        "/AcademiaMonitoringStack/RdsMemoryAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RdsMemoryAlarm4CDBEDF1"
+          }
+        ],
+        "/AcademiaMonitoringStack/RdsReadLatencyAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RdsReadLatencyAlarm4C08B81C"
+          }
+        ],
+        "/AcademiaMonitoringStack/Api4xxAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Api4xxAlarm2D137FC8"
+          }
+        ],
+        "/AcademiaMonitoringStack/Api5xxAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Api5xxAlarm31F257DC"
+          }
+        ],
+        "/AcademiaMonitoringStack/ApiLatencyAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ApiLatencyAlarm453002C0"
+          }
+        ],
+        "/AcademiaMonitoringStack/CloudFrontErrorAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CloudFrontErrorAlarmBA6786A9"
+          }
+        ],
+        "/AcademiaMonitoringStack/BackendLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BackendLogGroupDA10F1B2"
+          }
+        ],
+        "/AcademiaMonitoringStack/ErrorMetricFilter/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorMetricFilter77F7AAD4"
+          }
+        ],
+        "/AcademiaMonitoringStack/ApplicationErrorAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ApplicationErrorAlarm3C0D912E"
+          }
+        ],
+        "/AcademiaMonitoringStack/AcademiaDashboard/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AcademiaDashboardCAF52829"
+          }
+        ],
+        "/AcademiaMonitoringStack/AlarmTopicArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AlarmTopicArn"
+          }
+        ],
+        "/AcademiaMonitoringStack/DashboardUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DashboardUrl"
+          }
+        ],
+        "/AcademiaMonitoringStack/FlowLogsLogGroup": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "FlowLogsLogGroup"
+          }
+        ],
+        "/AcademiaMonitoringStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/AcademiaMonitoringStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/AcademiaMonitoringStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "AcademiaMonitoringStack"
     },
     "Tree": {
       "type": "cdk:tree",

@@ -16,8 +16,9 @@ export interface AcademiaFrontendStackProps extends cdk.StackProps {
 }
 
 export class AcademiaFrontendStack extends cdk.Stack {
-	public readonly distribution: cloudfront.IDistribution;
+	public readonly distribution: cloudfront.Distribution;
 	public readonly bucket: s3.IBucket;
+	public readonly distributionId: string;
 
 	constructor(scope: Construct, id: string, props: AcademiaFrontendStackProps) {
 		super(scope, id, props);
@@ -146,6 +147,9 @@ export class AcademiaFrontendStack extends cdk.Stack {
 				),
 			});
 		}
+
+		// Expose distribution ID for monitoring
+		this.distributionId = this.distribution.distributionId;
 
 		// Outputs
 		new cdk.CfnOutput(this, "FrontendUrl", {

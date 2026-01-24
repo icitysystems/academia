@@ -21,6 +21,9 @@ export class AcademiaBackendLambdaStack extends cdk.Stack {
 	public readonly apiUrl: string;
 	public readonly assetsBucket: s3.IBucket;
 	public readonly vpc: ec2.IVpc;
+	public readonly lambdaFunctionName: string;
+	public readonly databaseIdentifier: string;
+	public readonly apiGatewayName: string;
 
 	constructor(
 		scope: Construct,
@@ -251,7 +254,7 @@ export class AcademiaBackendLambdaStack extends cdk.Stack {
 				? {
 						domainName: apiDomain,
 						certificate: apiCertificate!,
-				  }
+					}
 				: undefined,
 			defaultCorsPreflightOptions: {
 				allowOrigins: [`https://${fullDomain}`, "http://localhost:3000"],
@@ -292,6 +295,11 @@ export class AcademiaBackendLambdaStack extends cdk.Stack {
 
 		// Set API URL
 		this.apiUrl = hostedZone ? `https://${apiDomain}` : api.url;
+
+		// Expose resource names for monitoring
+		this.lambdaFunctionName = backendFn.functionName;
+		this.databaseIdentifier = database.instanceIdentifier;
+		this.apiGatewayName = api.restApiName;
 
 		// ========================================================================
 		// Outputs
