@@ -47,7 +47,7 @@
 		"stripe": "^14.25.0",
 		"tesseract.js": "^5.0.0",
 		"uuid": "^9.0.0",
-		"@tensorflow/tfjs-node": "^4.17.0",
+		"@tensorflow/tfjs": "^4.17.0",
 		"nodemailer": "^6.9.7"
 	},
 	"devDependencies": {

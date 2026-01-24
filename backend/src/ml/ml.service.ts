@@ -82,11 +82,16 @@ export class MLService {
 
 			for (const region of sheet.template.regions) {
 				const regionOcr = ocrData[region.id] || {};
+				// Get expected answer from region metadata if available
+				const regionMetadata = region.metadata
+					? JSON.parse(region.metadata)
+					: {};
+				const expectedAnswer = regionMetadata.expectedAnswer || "";
 				const tfPrediction = await this.tfInference.predict(
 					modelId,
 					region,
 					regionOcr,
-					region.expectedAnswer,
+					expectedAnswer,
 				);
 
 				predictions.push({

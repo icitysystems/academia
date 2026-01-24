@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import * as tf from "@tensorflow/tfjs-node";
+import * as tf from "@tensorflow/tfjs";
 import { PrismaService } from "../prisma.service";
 import { StorageService } from "../storage/storage.service";
 
@@ -110,7 +110,11 @@ export class TensorFlowInferenceService implements OnModuleInit {
 			}
 
 			// Load model metadata
-			const metadata = modelRecord.metadata as ModelMetadata;
+			const metadata = modelRecord.metadata
+				? ((typeof modelRecord.metadata === "string"
+						? JSON.parse(modelRecord.metadata)
+						: modelRecord.metadata) as ModelMetadata)
+				: null;
 			if (metadata) {
 				this.modelMetadata.set(modelId, metadata);
 			}
@@ -652,17 +656,18 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 		// Extract final metrics
 		const finalEpoch = history.history.loss.length - 1;
+		const accuracyValue = Number(history.history.acc?.[finalEpoch]) || 0;
 		const metrics = {
-			accuracy: history.history.acc?.[finalEpoch] || 0,
+			accuracy: accuracyValue,
 			loss: history.history.loss[finalEpoch],
-			validationAccuracy: history.history.val_acc?.[finalEpoch] || 0,
+			validationAccuracy: Number(history.history.val_acc?.[finalEpoch]) || 0,
 			validationLoss: history.history.val_loss?.[finalEpoch] || 0,
 			epochs: config.epochs,
 			samples: trainingData.length,
 		};
 
 		this.logger.log(
-			`Training complete: accuracy=${(metrics.accuracy * 100).toFixed(1)}%`,
+			`Training complete: accuracy=${(accuracyValue * 100).toFixed(1)}%`,
 		);
 
 		return { model, metrics };
