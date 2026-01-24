@@ -169,29 +169,4 @@ export class ExamGradingSession {
 	createdAt: Date;
 }
 
-@ObjectType()
-export class GradingSummary {
-	@Field(() => Int)
-	totalSubmissions: number;
-
-	@Field(() => Int)
-	gradedCount: number;
-
-	@Field(() => Int)
-	reviewedCount: number;
-
-	@Field(() => Int)
-	pendingReviewCount: number;
-
-	@Field(() => Float, { nullable: true })
-	averageScore?: number;
-
-	@Field(() => Float, { nullable: true })
-	highestScore?: number;
-
-	@Field(() => Float, { nullable: true })
-	lowestScore?: number;
-
-	@Field({ nullable: true })
-	gradeDistribution?: string; // JSON
-}
+// GradingSummary is exported from grading-summary.model.ts

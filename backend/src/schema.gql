@@ -206,6 +206,55 @@ type GradingStats {
   scoreDistribution: JSON!
 }
 
+type QuestionAnalysis {
+  questionId: String!
+  questionNumber: Int!
+  questionType: String!
+  maxMarks: Float!
+  averageScore: Float!
+  averagePercentage: Float!
+  difficulty: String!
+  responseCount: Int!
+  correctCount: Int!
+  partialCount: Int!
+  incorrectCount: Int!
+}
+
+type CommonMistake {
+  questionId: String!
+  questionNumber: Int!
+  incorrectCount: Int!
+  explanations: [String!]!
+}
+
+type ConfidenceDistribution {
+  highConfidence: Int!
+  mediumConfidence: Int!
+  lowConfidence: Int!
+}
+
+type GradingSummary {
+  totalSubmissions: Int!
+  gradedCount: Int!
+  reviewedCount: Int!
+  pendingReviewCount: Int!
+  averageScore: Float
+  highestScore: Float
+  lowestScore: Float
+  standardDeviation: Float
+  gradeDistribution: JSON!
+  confidenceDistribution: ConfidenceDistribution!
+  questionAnalysis: [QuestionAnalysis!]!
+  commonMistakes: [CommonMistake!]!
+  generatedAt: DateTime!
+}
+
+type ReviewQueuePriority {
+  high: Int!
+  medium: Int!
+  low: Int!
+}
+
 type ExamQuestion {
   id: ID!
   examPaperId: String!
@@ -382,17 +431,6 @@ type ExamGradingSession {
   createdAt: DateTime!
 }
 
-type GradingSummary {
-  totalSubmissions: Int!
-  gradedCount: Int!
-  reviewedCount: Int!
-  pendingReviewCount: Int!
-  averageScore: Float
-  highestScore: Float
-  lowestScore: Float
-  gradeDistribution: String
-}
-
 type PDFOutput {
   id: ID!
   sheetId: String!
@@ -434,7 +472,7 @@ type ClassSummary {
   gradeDistribution: JSON!
 }
 
-type QuestionAnalysis {
+type TemplateQuestionAnalysis {
   regionId: ID!
   label: String!
   questionType: String!
@@ -1178,8 +1216,24 @@ type QuestionBankList {
 }
 
 type Query {
-  me: User!
+  me: JSON!
   hello: String!
+  user(id: ID!): JSON!
+  users(role: String, isActive: Boolean, search: String, skip: Int, take: Int): JSON!
+  studentDashboard: JSON!
+  studentGrades(studentId: ID): JSON!
+  facultyDashboard: JSON!
+  classRoster(courseId: ID!): [JSON!]!
+
+  """Get detailed progress for a linked student"""
+  studentProgress(studentId: String!): JSON!
+  adminDashboard: JSON!
+  institutionalReport(reportType: String!): JSON!
+  supportDashboard: JSON!
+
+  """Get parent dashboard with linked student summaries"""
+  parentDashboard: JSON!
+  childProgress(studentId: ID!): JSON!
   templates: [Template!]!
   template(id: ID!): Template!
   annotations(templateId: ID): [Annotation!]!
@@ -1205,12 +1259,13 @@ type Query {
   requestAIProposedResponses(input: RequestAIProposalInput!): ProposedResponses!
   moderationSamples(examPaperId: ID!): [ModerationSample!]!
   studentSubmissions(examPaperId: ID!, status: String): [StudentExamSubmission!]!
+  responsesNeedingReview(examPaperId: ID!, priority: String, limit: Float, questionId: ID): JSON!
   examGradingSummary(examPaperId: ID!): GradingSummary!
   sheetPDF(sheetId: ID!): PDFOutput
   templatePDFs(templateId: ID!): [PDFOutput!]!
   printJobs(status: String): [PrintJob!]!
   classSummary(templateId: ID!): ClassSummary!
-  questionAnalysis(templateId: ID!): [QuestionAnalysis!]!
+  questionAnalysis(templateId: ID!): [TemplateQuestionAnalysis!]!
   studentReport(studentId: String!): StudentReport!
   exportResultsCSV(templateId: ID!): String!
   scoreDistribution(templateId: ID!): [ScoreDistribution!]!
@@ -1275,6 +1330,59 @@ type Query {
   question(id: String!): QuestionBankItem
   questions(filter: QuestionFilterInput): QuestionBankList!
   publicQuestions(filter: QuestionFilterInput): QuestionBankList!
+  supportTicket(id: ID!): JSON!
+  myTickets(status: String): [JSON!]!
+  allTickets(status: String, category: String, priority: String, assigneeId: ID, skip: Int, take: Int): JSON!
+  supportDashboardStats: JSON!
+  systemHealth: JSON!
+  serverStatus: JSON!
+  errorLogs(action: String, startDate: String, endDate: String, limit: Int): JSON!
+  securityAlerts: JSON!
+  databaseHealth: JSON!
+  discussionThread(threadId: ID!): JSON!
+  courseDiscussions(courseId: ID!, search: String, skip: Int, take: Int): JSON!
+  myDiscussionThreads(skip: Int, take: Int): JSON!
+  myDiscussionPosts(skip: Int, take: Int): JSON!
+  discussionStats: JSON!
+  publicCourseCatalog(category: String, level: String, search: String, skip: Int, take: Int): JSON!
+  publicCourseCategories: [JSON!]!
+  publicResources: JSON!
+  alumniDashboard: JSON!
+  continuingEducationPrograms: [JSON!]!
+  careerResources: JSON!
+  alumniEvents: [JSON!]!
+  alumniDirectory(search: String, graduationYear: String, company: String, skip: Int, take: Int): JSON!
+  alumniCertificates: [JSON!]!
+
+  """Generate compliance report"""
+  complianceReport(reportType: String!): JSON!
+
+  """Get content flagged for moderation"""
+  contentForModeration(contentType: String, status: String, skip: Float, take: Float): JSON!
+
+  """Get system settings"""
+  systemSettings: JSON!
+
+  """Get pending disputes"""
+  pendingDisputes: JSON!
+
+  """Export user data for GDPR compliance"""
+  exportUserData(userId: String!): JSON!
+
+  """Get all linked students"""
+  linkedStudents: JSON!
+
+  """Get parent notification preferences"""
+  parentNotificationPreferences: JSON!
+
+  """Get parent notifications"""
+  parentNotifications(limit: Float): JSON!
+
+  """Get upcoming events for linked students"""
+  linkedStudentEvents: JSON!
+
+  """Get messages from instructors"""
+  instructorMessages: JSON!
 }
 
 input ExamPaperFilterInput {
@@ -1365,6 +1473,12 @@ type Mutation {
   register(input: RegisterInput!): AuthResponse!
   login(input: LoginInput!): AuthResponse!
   googleLogin(input: GoogleLoginInput!): AuthResponse!
+  createUser(email: String!, name: String, role: String): JSON!
+  updateUser(id: ID!, name: String, phone: String, role: String): JSON!
+  deleteUser(id: ID!, hardDelete: Boolean = false): JSON!
+  requestTranscript(purpose: String, copies: Int, deliveryMethod: String, address: String): JSON!
+  assignTicket(ticketId: ID!, assigneeId: ID!): JSON!
+  resolveTicket(ticketId: ID!, resolution: String!): JSON!
   createTemplate(input: CreateTemplateInput!): Template!
   updateTemplate(id: ID!, input: UpdateTemplateInput!): Template!
   deleteTemplate(id: ID!): Template!
@@ -1400,6 +1514,7 @@ type Mutation {
   bulkUploadSubmissions(input: BulkUploadSubmissionsInput!): [StudentExamSubmission!]!
   startExamBatchGrading(input: StartBatchGradingInput!): ExamGradingSession!
   reviewStudentResponse(input: ReviewResponseInput!): StudentResponse!
+  batchApproveHighConfidence(examPaperId: ID!): JSON!
   finalizeExamGrading(input: FinalizeGradingInput!): ExamPaperSetup!
   generatePDF(input: GeneratePDFInput!): PDFOutput!
   batchGeneratePDFs(sheetIds: [ID!]!, options: PDFOptionsInput): BatchPDFResult!
@@ -1485,6 +1600,50 @@ type Mutation {
   deletePresentation(id: String!): Boolean!
   createQuestion(input: CreateQuestionInput!): QuestionBankItem!
   updateQuestion(id: String!, input: UpdateQuestionInput!): QuestionBankItem!
+  createSupportTicket(title: String!, description: String!, category: String, priority: String): JSON!
+  updateTicketStatus(ticketId: ID!, status: String!): JSON!
+  closeTicket(ticketId: ID!): JSON!
+  addTicketComment(ticketId: ID!, content: String!, isInternal: Boolean = false): JSON!
+  triggerMaintenance(taskType: String!, options: String): JSON!
+  createDiscussionThread(title: String!, content: String!, courseId: ID, classSubjectId: ID): JSON!
+  updateDiscussionThread(threadId: ID!, title: String, content: String): JSON!
+  deleteDiscussionThread(threadId: ID!): Boolean!
+  togglePinThread(threadId: ID!): JSON!
+  toggleLockThread(threadId: ID!): JSON!
+  createDiscussionPost(threadId: ID!, content: String!, parentId: ID): JSON!
+  updateDiscussionPost(postId: ID!, content: String!): JSON!
+  deleteDiscussionPost(postId: ID!): Boolean!
+  upvotePost(postId: ID!): JSON!
+  markPostAsAnswer(postId: ID!): JSON!
+  updateAlumniProfile(name: String, phone: String, avatarUrl: String, linkedIn: String, company: String, jobTitle: String, graduationYear: String): JSON!
+  enrollInContinuingEducation(courseId: ID!): JSON!
+  requestCareerService(serviceType: String!, details: String): JSON!
+  registerForAlumniEvent(eventId: ID!): JSON!
+  requestAlumniTranscript(purpose: String, copies: Int, deliveryMethod: String, address: String): JSON!
+
+  """Moderate flagged content"""
+  moderateContent(contentType: String!, contentId: String!, action: String!, reason: String): JSON!
+
+  """Update system settings"""
+  updateSystemSettings(settings: JSON!): JSON!
+
+  """Resolve a dispute"""
+  resolveDispute(disputeId: String!, resolution: String!, outcome: String!): JSON!
+
+  """Delete user data (right to be forgotten)"""
+  deleteUserData(userId: String!, confirmation: String!): JSON!
+
+  """Request to link a student to parent account"""
+  requestStudentLink(studentEmail: String!): JSON!
+
+  """Update access level for linked student"""
+  updateStudentAccessLevel(studentId: String!, accessLevel: String!): JSON!
+
+  """Update parent notification preferences"""
+  updateParentNotificationPreferences(preferences: JSON!): JSON!
+
+  """Send message to instructor"""
+  sendInstructorMessage(subject: String!, message: String!, studentId: String): JSON!
 }
 
 input RegisterInput {

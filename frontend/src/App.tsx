@@ -66,7 +66,7 @@ import {
 } from './pages/LearningResources';
 
 // Grading Pages
-import { GradingDashboard } from './pages/Grading';
+import { GradingDashboard, ExamPaperBuilder, GradingReview } from './pages/Grading';
 
 // Professional University Theme
 const theme = createTheme({
@@ -256,6 +256,30 @@ const AppContent: React.FC = () => {
             element={
               <ProtectedRoute>
                 <GradingDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/grading/exam/new"
+            element={
+              <ProtectedRoute>
+                <ExamPaperBuilder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/grading/exam/:examId/edit"
+            element={
+              <ProtectedRoute>
+                <ExamPaperBuilder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/grading/review/:sessionId"
+            element={
+              <ProtectedRoute>
+                <GradingReview />
               </ProtectedRoute>
             }
           />

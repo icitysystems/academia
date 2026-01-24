@@ -24,6 +24,10 @@ import { QuizzesModule } from "./quizzes/quizzes.module";
 import { AssignmentsModule } from "./assignments/assignments.module";
 import { PedagogicModule } from "./pedagogic/pedagogic.module";
 import { SupportModule } from "./support/support.module";
+import { DiscussionsModule } from "./discussions/discussions.module";
+import { AlumniModule } from "./alumni/alumni.module";
+import { ComplianceModule } from "./compliance/compliance.module";
+import { ParentModule } from "./parent/parent.module";
 import configuration from "./config/configuration";
 
 @Module({
@@ -82,6 +86,10 @@ import configuration from "./config/configuration";
 		AssignmentsModule,
 		PedagogicModule,
 		SupportModule,
+		DiscussionsModule,
+		AlumniModule,
+		ComplianceModule,
+		ParentModule,
 	],
 	providers: [PrismaService],
 	exports: [PrismaService],

@@ -1,5 +1,6 @@
-import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
+﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
 import { UseGuards } from "@nestjs/common";
+import { GraphQLJSON } from "graphql-type-json";
 import { PrismaService } from "../prisma.service";
 import { UsersService } from "./users.service";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -34,12 +35,12 @@ export class UsersResolver {
 	// User Profile (All Roles)
 	// ============================
 
-	@Query(() => Object, { name: "me" })
+	@Query(() => GraphQLJSON, { name: "me" })
 	async getCurrentUser(@CurrentUser() user: any) {
 		return this.usersService.getUser(user.sub);
 	}
 
-	@Query(() => Object, { name: "user" })
+	@Query(() => GraphQLJSON, { name: "user" })
 	async getUser(
 		@Args("id", { type: () => ID }) id: string,
 		@CurrentUser() user: any,
@@ -51,7 +52,7 @@ export class UsersResolver {
 	// Admin User Management (2A.3)
 	// ============================
 
-	@Query(() => Object, { name: "users" })
+	@Query(() => GraphQLJSON, { name: "users" })
 	@Roles(UserRole.ADMIN)
 	async listUsers(
 		@CurrentUser() user: any,
@@ -70,7 +71,7 @@ export class UsersResolver {
 		});
 	}
 
-	@Mutation(() => Object, { name: "createUser" })
+	@Mutation(() => GraphQLJSON, { name: "createUser" })
 	@Roles(UserRole.ADMIN)
 	async createUser(
 		@Args("email") email: string,
@@ -81,7 +82,7 @@ export class UsersResolver {
 		return this.usersService.createUser({ email, name, role }, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "updateUser" })
+	@Mutation(() => GraphQLJSON, { name: "updateUser" })
 	async updateUser(
 		@Args("id", { type: () => ID }) id: string,
 		@Args("name", { nullable: true }) name: string,
@@ -92,7 +93,7 @@ export class UsersResolver {
 		return this.usersService.updateUser(id, { name, phone, role }, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "deleteUser" })
+	@Mutation(() => GraphQLJSON, { name: "deleteUser" })
 	@Roles(UserRole.ADMIN)
 	async deleteUser(
 		@Args("id", { type: () => ID }) id: string,
@@ -107,13 +108,13 @@ export class UsersResolver {
 	// Student Dashboard (2A.1, 3A.1)
 	// ============================
 
-	@Query(() => Object, { name: "studentDashboard" })
+	@Query(() => GraphQLJSON, { name: "studentDashboard" })
 	@Roles(UserRole.STUDENT)
 	async getStudentDashboard(@CurrentUser() user: any) {
 		return this.usersService.getStudentDashboard(user.sub);
 	}
 
-	@Query(() => Object, { name: "studentGrades" })
+	@Query(() => GraphQLJSON, { name: "studentGrades" })
 	@Roles(UserRole.STUDENT, UserRole.PARENT)
 	async getStudentGrades(
 		@CurrentUser() user: any,
@@ -124,7 +125,7 @@ export class UsersResolver {
 		return this.usersService.getStudentGrades(targetId);
 	}
 
-	@Mutation(() => Object, { name: "requestTranscript" })
+	@Mutation(() => GraphQLJSON, { name: "requestTranscript" })
 	@Roles(UserRole.STUDENT)
 	async requestTranscript(
 		@Args("purpose", { nullable: true }) purpose: string,
@@ -145,13 +146,13 @@ export class UsersResolver {
 	// Faculty Dashboard (2A.2, 3A.2)
 	// ============================
 
-	@Query(() => Object, { name: "facultyDashboard" })
+	@Query(() => GraphQLJSON, { name: "facultyDashboard" })
 	@Roles(UserRole.FACULTY)
 	async getFacultyDashboard(@CurrentUser() user: any) {
 		return this.usersService.getFacultyDashboard(user.sub);
 	}
 
-	@Query(() => [Object], { name: "classRoster" })
+	@Query(() => [GraphQLJSON], { name: "classRoster" })
 	@Roles(UserRole.FACULTY, UserRole.ADMIN)
 	async getClassRoster(
 		@Args("courseId", { type: () => ID }) courseId: string,
@@ -160,7 +161,7 @@ export class UsersResolver {
 		return this.usersService.getClassRoster(user.sub, courseId);
 	}
 
-	@Query(() => Object, { name: "studentProgress" })
+	@Query(() => GraphQLJSON, { name: "studentProgress" })
 	@Roles(UserRole.FACULTY)
 	async trackStudentProgress(
 		@Args("studentId", { type: () => ID }) studentId: string,
@@ -178,13 +179,13 @@ export class UsersResolver {
 	// Admin Dashboard (2A.3, 3A.3)
 	// ============================
 
-	@Query(() => Object, { name: "adminDashboard" })
+	@Query(() => GraphQLJSON, { name: "adminDashboard" })
 	@Roles(UserRole.ADMIN)
 	async getAdminDashboard(@CurrentUser() user: any) {
 		return this.usersService.getAdminDashboard(user.sub);
 	}
 
-	@Query(() => Object, { name: "institutionalReport" })
+	@Query(() => GraphQLJSON, { name: "institutionalReport" })
 	@Roles(UserRole.ADMIN)
 	async generateInstitutionalReport(
 		@Args("reportType") reportType: string,
@@ -197,13 +198,13 @@ export class UsersResolver {
 	// Support Staff (2A.4, 3A.4)
 	// ============================
 
-	@Query(() => Object, { name: "supportDashboard" })
+	@Query(() => GraphQLJSON, { name: "supportDashboard" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async getSupportDashboard(@CurrentUser() user: any) {
 		return this.usersService.getSupportDashboard(user.sub);
 	}
 
-	@Mutation(() => Object, { name: "assignTicket" })
+	@Mutation(() => GraphQLJSON, { name: "assignTicket" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async assignTicket(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -213,7 +214,7 @@ export class UsersResolver {
 		return this.usersService.assignTicket(ticketId, assigneeId, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "resolveTicket" })
+	@Mutation(() => GraphQLJSON, { name: "resolveTicket" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async resolveTicket(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -227,13 +228,13 @@ export class UsersResolver {
 	// Parent Dashboard (2A.5, 3A.5)
 	// ============================
 
-	@Query(() => Object, { name: "parentDashboard" })
+	@Query(() => GraphQLJSON, { name: "parentDashboard" })
 	@Roles(UserRole.PARENT)
 	async getParentDashboard(@CurrentUser() user: any) {
 		return this.usersService.getParentDashboard(user.sub);
 	}
 
-	@Query(() => Object, { name: "childProgress" })
+	@Query(() => GraphQLJSON, { name: "childProgress" })
 	@Roles(UserRole.PARENT)
 	async getStudentProgressForParent(
 		@Args("studentId", { type: () => ID }) studentId: string,
@@ -242,3 +243,4 @@ export class UsersResolver {
 		return this.usersService.getStudentProgressForParent(user.sub, studentId);
 	}
 }
+

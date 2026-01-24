@@ -2,7 +2,7 @@ import { Resolver, Query, Args, ID } from "@nestjs/graphql";
 import { UseGuards } from "@nestjs/common";
 import { ReportingService } from "./reporting.service";
 import { ClassSummary } from "./models/class-summary.model";
-import { QuestionAnalysis } from "./models/question-analysis.model";
+import { TemplateQuestionAnalysis } from "./models/question-analysis.model";
 import { StudentReport } from "./models/student-report.model";
 import { ScoreDistribution } from "./models/score-distribution.model";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -21,7 +21,7 @@ export class ReportingResolver {
 		return this.reportingService.getClassSummary(templateId, user.sub);
 	}
 
-	@Query(() => [QuestionAnalysis])
+	@Query(() => [TemplateQuestionAnalysis])
 	async questionAnalysis(
 		@Args("templateId", { type: () => ID }) templateId: string,
 		@CurrentUser() user: any,

@@ -166,26 +166,31 @@ export class UsersService {
 
 		const enrollments = await this.prisma.enrollment.findMany({
 			where: {
-				userId: studentId,
+				studentId: studentId,
 				status: "ACTIVE",
 			},
 			include: {
 				course: {
 					include: {
-						lessons: true,
-						onlineQuizzes: true,
-						assignments: true,
+						modules: {
+							include: {
+								lessons: true,
+							},
+						},
 					},
 				},
 			},
 		});
 
-		// Get upcoming assignments
+		// Get course IDs for upcoming assignments
+		const courseIds = enrollments.map((e) => e.courseId);
+
+		// Get upcoming assignments for enrolled courses
 		const upcomingAssignments = await this.prisma.assignment.findMany({
 			where: {
-				course: {
-					enrollments: {
-						some: { userId: studentId },
+				lesson: {
+					module: {
+						courseId: { in: courseIds },
 					},
 				},
 				dueDate: {
@@ -196,11 +201,11 @@ export class UsersService {
 			take: 5,
 		});
 
-		// Get recent grades
+		// Get recent grades (using score)
 		const recentGrades = await this.prisma.assignmentSubmission.findMany({
 			where: {
 				studentId,
-				grade: { not: null },
+				score: { not: null },
 			},
 			orderBy: { gradedAt: "desc" },
 			take: 10,
@@ -245,26 +250,36 @@ export class UsersService {
 		const submissions = await this.prisma.assignmentSubmission.findMany({
 			where: {
 				studentId,
-				grade: { not: null },
+				score: { not: null },
 			},
 			include: {
 				assignment: {
-					include: { course: true },
+					include: {
+						lesson: {
+							include: {
+								module: {
+									include: { course: true },
+								},
+							},
+						},
+					},
 				},
 			},
 			orderBy: { gradedAt: "desc" },
 		});
 
-		// Calculate GPA if applicable
-		const grades = submissions.map((s) => s.grade).filter((g) => g !== null);
-		const averageGrade =
-			grades.length > 0
-				? grades.reduce((a, b) => a + b, 0) / grades.length
+		// Calculate average score
+		const scores = submissions
+			.map((s) => s.score)
+			.filter((s): s is number => s !== null);
+		const averageScore =
+			scores.length > 0
+				? scores.reduce((a, b) => a + b, 0) / scores.length
 				: null;
 
 		return {
 			submissions,
-			averageGrade,
+			averageScore,
 			totalSubmissions: submissions.length,
 		};
 	}
@@ -286,21 +301,27 @@ export class UsersService {
 				_count: {
 					select: {
 						enrollments: true,
-						lessons: true,
-						assignments: true,
+						modules: true,
 					},
 				},
 			},
 		});
 
+		// Get course IDs for this faculty
+		const courseIds = courses.map((c) => c.id);
+
 		// Pending submissions to grade
 		const pendingSubmissions = await this.prisma.assignmentSubmission.findMany({
 			where: {
 				assignment: {
-					course: { instructorId: facultyId },
+					lesson: {
+						module: {
+							courseId: { in: courseIds },
+						},
+					},
 				},
 				status: "SUBMITTED",
-				grade: null,
+				score: null,
 			},
 			include: {
 				assignment: true,
@@ -324,7 +345,10 @@ export class UsersService {
 			pendingSubmissions,
 			examPapers,
 			totalCourses: courses.length,
-			totalStudents: courses.reduce((sum, c) => sum + c._count.enrollments, 0),
+			totalStudents: courses.reduce(
+				(sum, c) => sum + (c._count?.enrollments || 0),
+				0,
+			),
 		};
 	}
 
@@ -351,14 +375,14 @@ export class UsersService {
 		const enrollments = await this.prisma.enrollment.findMany({
 			where: { courseId },
 			include: {
-				user: true,
+				student: true,
 			},
 		});
 
 		return enrollments.map((e) => ({
-			studentId: e.userId,
-			studentName: e.user.name,
-			email: e.user.email,
+			studentId: e.studentId,
+			studentName: e.student.name,
+			email: e.student.email,
 			enrolledAt: e.enrolledAt,
 			status: e.status,
 		}));
@@ -387,29 +411,40 @@ export class UsersService {
 			throw new NotFoundException("Course not found");
 		}
 
-		// Get student's submissions
+		// Get student's submissions for this course
 		const submissions = await this.prisma.assignmentSubmission.findMany({
 			where: {
 				studentId,
-				assignment: { courseId },
+				assignment: {
+					lesson: {
+						module: { courseId },
+					},
+				},
 			},
 			include: { assignment: true },
 		});
 
-		// Get quiz attempts
+		// Get quiz attempts for this course
 		const quizAttempts = await this.prisma.quizAttempt.findMany({
 			where: {
 				studentId,
-				quiz: { courseId },
+				quiz: {
+					lesson: {
+						module: { courseId },
+					},
+				},
 			},
 			include: { quiz: true },
 		});
 
-		// Get lesson progress if applicable
-		const lessonProgress = await this.prisma.lesson.count({
+		// Get lesson progress
+		const lessonProgress = await this.prisma.lessonProgress.count({
 			where: {
-				courseId,
-				// Add completion tracking here
+				enrollment: {
+					studentId,
+					courseId,
+				},
+				status: "COMPLETED",
 			},
 		});
 
@@ -418,14 +453,15 @@ export class UsersService {
 			courseId,
 			submissions,
 			quizAttempts,
+			completedLessons: lessonProgress,
 			totalAssignments: submissions.length,
-			completedAssignments: submissions.filter((s) => s.grade !== null).length,
+			completedAssignments: submissions.filter((s) => s.score !== null).length,
 			averageScore:
-				submissions.filter((s) => s.grade !== null).length > 0
+				submissions.filter((s) => s.score !== null).length > 0
 					? submissions
-							.filter((s) => s.grade !== null)
-							.reduce((sum, s) => sum + (s.grade || 0), 0) /
-						submissions.filter((s) => s.grade !== null).length
+							.filter((s) => s.score !== null)
+							.reduce((sum, s) => sum + (s.score || 0), 0) /
+						submissions.filter((s) => s.score !== null).length
 					: null,
 		};
 	}
@@ -533,23 +569,23 @@ export class UsersService {
 	}
 
 	private async generateAcademicPerformanceReport() {
-		// Aggregate grade data
+		// Aggregate score data
 		const submissions = await this.prisma.assignmentSubmission.findMany({
-			where: { grade: { not: null } },
-			select: { grade: true },
+			where: { score: { not: null } },
+			select: { score: true },
 		});
 
-		const grades = submissions.map((s) => s.grade);
-		const avgGrade =
-			grades.length > 0
-				? grades.reduce((a, b) => a + (b || 0), 0) / grades.length
-				: 0;
+		const scores = submissions
+			.map((s) => s.score)
+			.filter((s): s is number => s !== null);
+		const avgScore =
+			scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
 
 		return {
 			type: "ACADEMIC_PERFORMANCE",
 			generatedAt: new Date(),
 			totalSubmissions: submissions.length,
-			averageGrade: avgGrade,
+			averageScore: avgScore,
 		};
 	}
 
@@ -693,6 +729,387 @@ export class UsersService {
 		}
 
 		return this.getStudentGrades(studentId);
+	}
+
+	/**
+	 * Link parent to student account
+	 * As per Specification 2A.5: "Link account to student(s)"
+	 */
+	async linkParentToStudent(
+		parentId: string,
+		studentEmail: string,
+		relationship: string = "PARENT",
+	) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		const student = await this.prisma.user.findFirst({
+			where: { email: studentEmail, role: UserRole.STUDENT },
+		});
+
+		if (!student) {
+			throw new NotFoundException("Student not found with this email");
+		}
+
+		// Check if already linked
+		const existing = await this.prisma.studentParent.findUnique({
+			where: {
+				studentId_parentId: { parentId, studentId: student.id },
+			},
+		});
+
+		if (existing) {
+			throw new ForbiddenException("Already linked to this student");
+		}
+
+		return this.prisma.studentParent.create({
+			data: {
+				parentId,
+				studentId: student.id,
+				relationship,
+				canViewGrades: true,
+				canViewPayments: false,
+			},
+			include: {
+				student: true,
+				parent: true,
+			},
+		});
+	}
+
+	/**
+	 * Remove parent-student link
+	 */
+	async unlinkParentFromStudent(parentId: string, studentId: string) {
+		await this.verifyRole(parentId, [UserRole.PARENT, UserRole.ADMIN]);
+
+		return this.prisma.studentParent.delete({
+			where: {
+				studentId_parentId: { parentId, studentId },
+			},
+		});
+	}
+
+	/**
+	 * Get student schedule for parent
+	 * As per Specification 2A.5: "Access student schedule"
+	 */
+	async getStudentScheduleForParent(parentId: string, studentId: string) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		const relationship = await this.prisma.studentParent.findFirst({
+			where: { parentId, studentId },
+		});
+
+		if (!relationship) {
+			throw new ForbiddenException("Not authorized to view this student");
+		}
+
+		// Get enrolled courses and their schedules
+		const enrollments = await this.prisma.enrollment.findMany({
+			where: { studentId: studentId, status: "ACTIVE" },
+			include: {
+				course: {
+					include: {
+						modules: {
+							include: {
+								lessons: {
+									orderBy: { orderIndex: "asc" },
+								},
+							},
+						},
+					},
+				},
+			},
+		});
+
+		return {
+			studentId,
+			enrollments: enrollments.map((e) => ({
+				courseId: e.courseId,
+				courseName: e.course.title,
+				enrolledAt: e.enrolledAt,
+				modules: e.course.modules.map((m) => ({
+					id: m.id,
+					title: m.title,
+					lessons: m.lessons.map((l) => ({
+						id: l.id,
+						title: l.title,
+						contentType: l.contentType,
+					})),
+				})),
+			})),
+		};
+	}
+
+	/**
+	 * Get student assignments for parent
+	 * As per Specification 2A.5: "Access student assignments"
+	 */
+	async getStudentAssignmentsForParent(parentId: string, studentId: string) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		const relationship = await this.prisma.studentParent.findFirst({
+			where: { parentId, studentId },
+		});
+
+		if (!relationship) {
+			throw new ForbiddenException("Not authorized to view this student");
+		}
+
+		const submissions = await this.prisma.assignmentSubmission.findMany({
+			where: { studentId },
+			include: {
+				assignment: {
+					include: {
+						lesson: {
+							include: {
+								module: {
+									include: { course: true },
+								},
+							},
+						},
+					},
+				},
+			},
+			orderBy: { submittedAt: "desc" },
+		});
+
+		return submissions.map((s) => ({
+			id: s.id,
+			assignmentTitle: s.assignment.title,
+			courseName: s.assignment.lesson?.module?.course?.title || "N/A",
+			dueDate: s.assignment.dueDate,
+			submittedAt: s.submittedAt,
+			status: s.status,
+			score: relationship.canViewGrades ? s.score : null,
+		}));
+	}
+
+	/**
+	 * Get student exam results for parent
+	 * As per Specification 2A.5: "View student progress reports"
+	 */
+	async getStudentExamResultsForParent(parentId: string, studentId: string) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		const relationship = await this.prisma.studentParent.findFirst({
+			where: { parentId, studentId, canViewGrades: true },
+		});
+
+		if (!relationship) {
+			throw new ForbiddenException(
+				"Not authorized to view this student's exam results",
+			);
+		}
+
+		const submissions = await this.prisma.studentExamSubmission.findMany({
+			where: {
+				studentId,
+				status: { in: ["GRADED", "REVIEWED"] },
+			},
+			include: {
+				examPaper: true,
+			},
+			orderBy: { gradedAt: "desc" },
+		});
+
+		return submissions.map((s) => ({
+			id: s.id,
+			examTitle: s.examPaper.title,
+			subject: s.examPaper.subject,
+			totalScore: s.totalScore,
+			percentage: s.percentage,
+			grade: s.grade,
+			gradedAt: s.gradedAt,
+		}));
+	}
+
+	/**
+	 * Send message to teacher (parent-teacher communication)
+	 * As per Specification 2A.5: "Communicate with faculty"
+	 */
+	async sendMessageToTeacher(
+		parentId: string,
+		teacherId: string,
+		subject: string,
+		message: string,
+		studentId?: string,
+	) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		// Verify teacher exists and is faculty
+		const teacher = await this.prisma.user.findFirst({
+			where: { id: teacherId, role: UserRole.FACULTY },
+		});
+
+		if (!teacher) {
+			throw new NotFoundException("Teacher not found");
+		}
+
+		// If student specified, verify parent-student link
+		if (studentId) {
+			const relationship = await this.prisma.studentParent.findFirst({
+				where: { parentId, studentId },
+			});
+
+			if (!relationship) {
+				throw new ForbiddenException("Not linked to this student");
+			}
+		}
+
+		// Create a support ticket for parent-teacher communication
+		return this.prisma.supportTicket.create({
+			data: {
+				submitterId: parentId,
+				assigneeId: teacherId,
+				title: subject,
+				description: message,
+				category: "PARENT_COMMUNICATION",
+				priority: "MEDIUM",
+				status: "OPEN",
+			},
+			include: {
+				submitter: true,
+				assignee: true,
+			},
+		});
+	}
+
+	/**
+	 * Get payment history for student (if parent has permission)
+	 * As per Specification 2A.5 implied: Financial visibility
+	 */
+	async getStudentPaymentsForParent(parentId: string, studentId: string) {
+		await this.verifyRole(parentId, [UserRole.PARENT]);
+
+		const relationship = await this.prisma.studentParent.findFirst({
+			where: { parentId, studentId, canViewPayments: true },
+		});
+
+		if (!relationship) {
+			throw new ForbiddenException(
+				"Not authorized to view this student's payments",
+			);
+		}
+
+		return this.prisma.payment.findMany({
+			where: { userId: studentId },
+			orderBy: { createdAt: "desc" },
+		});
+	}
+
+	// ============================
+	// Alumni/Guest Access (2A.6)
+	// ============================
+
+	/**
+	 * Get alumni portal access
+	 * As per Specification 2A.6: "Limited access to resources"
+	 */
+	async getAlumniPortal(alumniId: string) {
+		await this.verifyRole(alumniId, [UserRole.ALUMNI]);
+
+		// Get alumni's historical data
+		const [pastCourses, certificates, communityGroups] = await Promise.all([
+			// Get completed enrollments
+			this.prisma.enrollment.findMany({
+				where: { studentId: alumniId, status: "COMPLETED" },
+				include: { course: true },
+			}),
+			// Get certificates earned
+			this.prisma.certificate.findMany({
+				where: { studentId: alumniId },
+			}),
+			// Get community memberships (if model exists)
+			Promise.resolve([]),
+		]);
+
+		return {
+			pastCourses: pastCourses.map((e) => ({
+				courseId: e.courseId,
+				title: e.course.title,
+				completedAt: e.completedAt,
+			})),
+			certificates,
+			communityGroups,
+			availableResources: await this.getPublicResources(),
+		};
+	}
+
+	/**
+	 * Get public resources available to alumni and guests
+	 * As per Specification 2A.6
+	 */
+	async getPublicResources() {
+		// Get publicly accessible courses
+		const publicCourses = await this.prisma.course.findMany({
+			where: {
+				isPublic: true,
+			},
+			select: {
+				id: true,
+				title: true,
+				description: true,
+				thumbnailUrl: true,
+				category: true,
+			},
+			take: 20,
+		});
+
+		return {
+			courses: publicCourses,
+		};
+	}
+
+	/**
+	 * Get guest preview of course
+	 * As per Specification 2A.6: "View public courses"
+	 */
+	async getGuestCoursePreview(courseId: string) {
+		const course = await this.prisma.course.findFirst({
+			where: {
+				id: courseId,
+				isPublic: true,
+			},
+			include: {
+				modules: {
+					include: {
+						lessons: {
+							where: { isFree: true },
+							take: 3,
+						},
+					},
+				},
+			},
+		});
+
+		if (!course) {
+			throw new NotFoundException(
+				"Course not found or not publicly accessible",
+			);
+		}
+
+		return {
+			...course,
+			isPreview: true,
+			message: "Sign up or log in to access full course content",
+		};
+	}
+
+	/**
+	 * Request transcript for alumni
+	 * As per Specification 2A.6: Alumni services
+	 */
+	async requestAlumniTranscript(alumniId: string, deliveryMethod: string) {
+		await this.verifyRole(alumniId, [UserRole.ALUMNI]);
+
+		return this.prisma.transcriptRequest.create({
+			data: {
+				requesterId: alumniId,
+				deliveryMethod,
+				status: "PENDING",
+			},
+		});
 	}
 
 	// ============================

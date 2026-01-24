@@ -1,4 +1,5 @@
-import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
+﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql"
+import { GraphQLJSON } from 'graphql-type-json';
 import { UseGuards } from "@nestjs/common";
 import { SupportService } from "./support.service";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -20,7 +21,7 @@ export class SupportResolver {
 	// Ticket Creation (All Users)
 	// ============================
 
-	@Mutation(() => Object, { name: "createSupportTicket" })
+	@Mutation(() => GraphQLJSON, { name: "createSupportTicket" })
 	async createTicket(
 		@Args("title") title: string,
 		@Args("description") description: string,
@@ -38,7 +39,7 @@ export class SupportResolver {
 	// Ticket Viewing
 	// ============================
 
-	@Query(() => Object, { name: "supportTicket" })
+	@Query(() => GraphQLJSON, { name: "supportTicket" })
 	async getTicket(
 		@Args("id", { type: () => ID }) id: string,
 		@CurrentUser() user: any,
@@ -46,7 +47,7 @@ export class SupportResolver {
 		return this.supportService.getTicket(id, user.sub);
 	}
 
-	@Query(() => [Object], { name: "myTickets" })
+	@Query(() => [GraphQLJSON], { name: "myTickets" })
 	async getMyTickets(
 		@CurrentUser() user: any,
 		@Args("status", { nullable: true }) status?: string,
@@ -54,7 +55,7 @@ export class SupportResolver {
 		return this.supportService.getUserTickets(user.sub, status);
 	}
 
-	@Query(() => Object, { name: "allTickets" })
+	@Query(() => GraphQLJSON, { name: "allTickets" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async getAllTickets(
 		@CurrentUser() user: any,
@@ -79,7 +80,7 @@ export class SupportResolver {
 	// Ticket Management (Support Staff)
 	// ============================
 
-	@Mutation(() => Object, { name: "assignTicket" })
+	@Mutation(() => GraphQLJSON, { name: "assignTicket" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async assignTicket(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -89,7 +90,7 @@ export class SupportResolver {
 		return this.supportService.assignTicket(ticketId, assigneeId, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "updateTicketStatus" })
+	@Mutation(() => GraphQLJSON, { name: "updateTicketStatus" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async updateTicketStatus(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -99,7 +100,7 @@ export class SupportResolver {
 		return this.supportService.updateTicketStatus(ticketId, status, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "resolveTicket" })
+	@Mutation(() => GraphQLJSON, { name: "resolveTicket" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async resolveTicket(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -109,7 +110,7 @@ export class SupportResolver {
 		return this.supportService.resolveTicket(ticketId, resolution, user.sub);
 	}
 
-	@Mutation(() => Object, { name: "closeTicket" })
+	@Mutation(() => GraphQLJSON, { name: "closeTicket" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async closeTicket(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
@@ -122,7 +123,7 @@ export class SupportResolver {
 	// Comments
 	// ============================
 
-	@Mutation(() => Object, { name: "addTicketComment" })
+	@Mutation(() => GraphQLJSON, { name: "addTicketComment" })
 	async addComment(
 		@Args("ticketId", { type: () => ID }) ticketId: string,
 		@Args("content") content: string,
@@ -142,15 +143,85 @@ export class SupportResolver {
 	// Dashboard & Monitoring
 	// ============================
 
-	@Query(() => Object, { name: "supportDashboardStats" })
+	@Query(() => GraphQLJSON, { name: "supportDashboardStats" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async getDashboardStats(@CurrentUser() user: any) {
 		return this.supportService.getDashboardStats(user.sub);
 	}
 
-	@Query(() => Object, { name: "systemHealth" })
+	@Query(() => GraphQLJSON, { name: "systemHealth" })
 	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
 	async getSystemHealth(@CurrentUser() user: any) {
 		return this.supportService.getSystemHealth(user.sub);
 	}
+
+	// ============================
+	// System Monitoring (Spec 2A.4)
+	// ============================
+
+	/**
+	 * Get server status and metrics
+	 * As per Spec 2A.4: "Maintain servers, databases, and security protocols"
+	 */
+	@Query(() => GraphQLJSON, { name: "serverStatus" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getServerStatus(@CurrentUser() user: any) {
+		return this.supportService.getServerStatus(user.sub);
+	}
+
+	/**
+	 * Get error logs
+	 * As per Spec 2A.4: "Troubleshoot login, access, or system errors"
+	 */
+	@Query(() => GraphQLJSON, { name: "errorLogs" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getErrorLogs(
+		@CurrentUser() user: any,
+		@Args("action", { nullable: true }) action?: string,
+		@Args("startDate", { nullable: true }) startDate?: string,
+		@Args("endDate", { nullable: true }) endDate?: string,
+		@Args("limit", { type: () => Int, nullable: true }) limit?: number,
+	) {
+		return this.supportService.getErrorLogs(user.sub, {
+			action,
+			startDate: startDate ? new Date(startDate) : undefined,
+			endDate: endDate ? new Date(endDate) : undefined,
+			limit,
+		});
+	}
+
+	/**
+	 * Get security alerts
+	 * As per Spec 2A.4: "Monitor system performance and uptime"
+	 */
+	@Query(() => GraphQLJSON, { name: "securityAlerts" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getSecurityAlerts(@CurrentUser() user: any) {
+		return this.supportService.getSecurityAlerts(user.sub);
+	}
+
+	/**
+	 * Database health check
+	 */
+	@Query(() => GraphQLJSON, { name: "databaseHealth" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getDatabaseHealth(@CurrentUser() user: any) {
+		return this.supportService.getDatabaseHealth(user.sub);
+	}
+
+	/**
+	 * Trigger system maintenance task
+	 * As per Spec 2A.4: "Manage updates and system upgrades"
+	 */
+	@Mutation(() => GraphQLJSON, { name: "triggerMaintenance" })
+	@Roles(UserRole.ADMIN)
+	async triggerMaintenance(
+		@CurrentUser() user: any,
+		@Args("taskType") taskType: string,
+		@Args("options", { nullable: true }) options?: string,
+	) {
+		return this.supportService.triggerMaintenance(user.sub, taskType, options);
+	}
 }
+
+

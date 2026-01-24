@@ -1,7 +1,7 @@
 import { ObjectType, Field, ID, Int, Float } from "@nestjs/graphql";
 
-@ObjectType()
-export class QuestionAnalysis {
+@ObjectType("TemplateQuestionAnalysis")
+export class TemplateQuestionAnalysis {
 	@Field(() => ID)
 	regionId: string;
 

@@ -3,3 +3,7 @@ dist/
 .env
 backend/dev.db
 frontend/node_modules/
+
+# Secrets
+.secret.json
+*.secret.json

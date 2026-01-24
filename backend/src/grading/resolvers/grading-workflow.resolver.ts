@@ -1,4 +1,5 @@
-import { Resolver, Query, Mutation, Args, ID } from "@nestjs/graphql";
+﻿import { Resolver, Query, Mutation, Args, ID } from "@nestjs/graphql"
+import { GraphQLJSON } from 'graphql-type-json';
 import { UseGuards } from "@nestjs/common";
 import { GradingWorkflowService } from "../services/grading-workflow.service";
 import {
@@ -261,7 +262,7 @@ export class GradingWorkflowResolver {
 	 * Get responses needing review with priority-based sorting
 	 * As per Specification 5A.5: "Smart prioritization (low-confidence scripts first)"
 	 */
-	@Query(() => Object, { name: "responsesNeedingReview" })
+	@Query(() => GraphQLJSON, { name: "responsesNeedingReview" })
 	async getResponsesNeedingReview(
 		@Args("examPaperId", { type: () => ID }) examPaperId: string,
 		@CurrentUser() user: any,
@@ -284,7 +285,7 @@ export class GradingWorkflowResolver {
 	 * Batch approve high-confidence responses
 	 * As per Specification 5A.5: "Bulk approval for high-confidence grades"
 	 */
-	@Mutation(() => Object, { name: "batchApproveHighConfidence" })
+	@Mutation(() => GraphQLJSON, { name: "batchApproveHighConfidence" })
 	async batchApproveHighConfidence(
 		@Args("examPaperId", { type: () => ID }) examPaperId: string,
 		@CurrentUser() user: any,
@@ -319,3 +320,4 @@ export class GradingWorkflowResolver {
 		);
 	}
 }
+

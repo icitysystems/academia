@@ -440,6 +440,480 @@ export class SupportService {
 		};
 	}
 
+	/**
+	 * Get comprehensive system metrics
+	 * As per Specification 2A.4: "Maintain servers, databases, and security protocols"
+	 */
+	async getSystemMetrics(userId: string) {
+		await this.verifySupportRole(userId);
+
+		const now = new Date();
+		const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+		const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+		const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+		const [
+			totalUsers,
+			usersByRole,
+			newUsersToday,
+			newUsersThisWeek,
+			activeGradingSessions,
+			totalGradedSubmissions,
+			pendingTickets,
+			recentAuditLogs,
+		] = await Promise.all([
+			this.prisma.user.count(),
+			this.prisma.user.groupBy({
+				by: ["role"],
+				_count: { id: true },
+			}),
+			this.prisma.user.count({
+				where: { createdAt: { gte: oneDayAgo } },
+			}),
+			this.prisma.user.count({
+				where: { createdAt: { gte: oneWeekAgo } },
+			}),
+			this.prisma.examGradingSession.count({
+				where: { status: { in: ["PENDING", "CALIBRATING", "GRADING"] } },
+			}),
+			this.prisma.studentExamSubmission.count({
+				where: { status: "GRADED" },
+			}),
+			this.prisma.supportTicket.count({
+				where: {
+					status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] },
+				},
+			}),
+			this.prisma.auditLog.count({
+				where: { createdAt: { gte: oneHourAgo } },
+			}),
+		]);
+
+		return {
+			timestamp: now,
+			users: {
+				total: totalUsers,
+				byRole: usersByRole.reduce(
+					(acc, item) => {
+						acc[item.role] = item._count.id;
+						return acc;
+					},
+					{} as Record<string, number>,
+				),
+				newToday: newUsersToday,
+				newThisWeek: newUsersThisWeek,
+			},
+			grading: {
+				activeSessions: activeGradingSessions,
+				totalGraded: totalGradedSubmissions,
+			},
+			support: {
+				pendingTickets,
+			},
+			activity: {
+				logsLastHour: recentAuditLogs,
+			},
+		};
+	}
+
+	/**
+	 * Get error logs for troubleshooting
+	 * As per Specification 2A.4: "Troubleshoot login, access, or system errors"
+	 */
+	async getErrorLogs(
+		userId: string,
+		options?: {
+			startDate?: Date;
+			endDate?: Date;
+			action?: string;
+			limit?: number;
+		},
+	) {
+		await this.verifySupportRole(userId);
+
+		const where: any = {};
+
+		if (options?.startDate || options?.endDate) {
+			where.createdAt = {};
+			if (options.startDate) where.createdAt.gte = options.startDate;
+			if (options.endDate) where.createdAt.lte = options.endDate;
+		}
+
+		if (options?.action) {
+			where.action = { contains: options.action };
+		}
+
+		// Filter for error-related actions
+		where.OR = [
+			{ action: { contains: "ERROR" } },
+			{ action: { contains: "FAIL" } },
+			{ action: { contains: "DENIED" } },
+			{ action: { contains: "UNAUTHORIZED" } },
+		];
+
+		return this.prisma.auditLog.findMany({
+			where,
+			include: {
+				user: {
+					select: {
+						id: true,
+						email: true,
+						name: true,
+						role: true,
+					},
+				},
+			},
+			orderBy: { createdAt: "desc" },
+			take: options?.limit || 100,
+		});
+	}
+
+	/**
+	 * Get all audit logs with filtering
+	 * As per Specification 2A.4: System monitoring and logging
+	 */
+	async getAuditLogs(
+		userId: string,
+		options?: {
+			userId?: string;
+			action?: string;
+			entityType?: string;
+			startDate?: Date;
+			endDate?: Date;
+			limit?: number;
+			offset?: number;
+		},
+	) {
+		await this.verifySupportRole(userId);
+
+		const where: any = {};
+
+		if (options?.userId) where.userId = options.userId;
+		if (options?.action) where.action = { contains: options.action };
+		if (options?.entityType) where.entityType = options.entityType;
+
+		if (options?.startDate || options?.endDate) {
+			where.createdAt = {};
+			if (options.startDate) where.createdAt.gte = options.startDate;
+			if (options.endDate) where.createdAt.lte = options.endDate;
+		}
+
+		const [logs, total] = await Promise.all([
+			this.prisma.auditLog.findMany({
+				where,
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true,
+							role: true,
+						},
+					},
+				},
+				orderBy: { createdAt: "desc" },
+				take: options?.limit || 50,
+				skip: options?.offset || 0,
+			}),
+			this.prisma.auditLog.count({ where }),
+		]);
+
+		return { logs, total };
+	}
+
+	/**
+	 * Create audit log entry
+	 */
+	async createAuditLog(
+		action: string,
+		userId?: string,
+		details?: {
+			entityType?: string;
+			entityId?: string;
+			details?: string;
+			ipAddress?: string;
+		},
+	) {
+		return this.prisma.auditLog.create({
+			data: {
+				userId,
+				action,
+				entityType: details?.entityType,
+				entityId: details?.entityId,
+				details: details?.details,
+				ipAddress: details?.ipAddress,
+			},
+		});
+	}
+
+	/**
+	 * Get user activity report for a specific user
+	 * As per Specification 2A.4: Support staff troubleshooting capabilities
+	 */
+	async getUserActivityReport(userId: string, targetUserId: string) {
+		await this.verifySupportRole(userId);
+
+		const user = await this.prisma.user.findUnique({
+			where: { id: targetUserId },
+			select: {
+				id: true,
+				email: true,
+				name: true,
+				role: true,
+				createdAt: true,
+				lastLoginAt: true,
+			},
+		});
+
+		if (!user) {
+			throw new NotFoundException("User not found");
+		}
+
+		const [recentActivity, ticketsSubmitted, gradingActivity, loginHistory] =
+			await Promise.all([
+				this.prisma.auditLog.findMany({
+					where: { userId: targetUserId },
+					orderBy: { createdAt: "desc" },
+					take: 20,
+				}),
+				this.prisma.supportTicket.count({
+					where: { submitterId: targetUserId },
+				}),
+				this.prisma.studentExamSubmission.count({
+					where: {
+						examPaper: { teacherId: targetUserId },
+					},
+				}),
+				this.prisma.auditLog.findMany({
+					where: {
+						userId: targetUserId,
+						action: { contains: "LOGIN" },
+					},
+					orderBy: { createdAt: "desc" },
+					take: 10,
+				}),
+			]);
+
+		return {
+			user,
+			recentActivity,
+			stats: {
+				ticketsSubmitted,
+				gradingActivity,
+			},
+			loginHistory,
+		};
+	}
+
+	/**
+	 * Get database statistics for maintenance
+	 * As per Specification 2A.4: "Maintain servers, databases, and security protocols"
+	 */
+	async getDatabaseStats(userId: string) {
+		await this.verifySupportRole(userId);
+
+		const [
+			userCount,
+			templateCount,
+			answerSheetCount,
+			examPaperCount,
+			submissionCount,
+			ticketCount,
+			auditLogCount,
+		] = await Promise.all([
+			this.prisma.user.count(),
+			this.prisma.template.count(),
+			this.prisma.answerSheet.count(),
+			this.prisma.examPaperSetup.count(),
+			this.prisma.studentExamSubmission.count(),
+			this.prisma.supportTicket.count(),
+			this.prisma.auditLog.count(),
+		]);
+
+		return {
+			timestamp: new Date(),
+			tables: {
+				users: userCount,
+				templates: templateCount,
+				answerSheets: answerSheetCount,
+				examPapers: examPaperCount,
+				submissions: submissionCount,
+				supportTickets: ticketCount,
+				auditLogs: auditLogCount,
+			},
+		};
+	}
+
+	/**
+	 * Get server status
+	 * As per Specification 2A.4: "Monitor system performance and uptime"
+	 */
+	async getServerStatus(userId: string) {
+		await this.verifySupportRole(userId);
+
+		const uptimeSeconds = process.uptime();
+		const memoryUsage = process.memoryUsage();
+
+		return {
+			timestamp: new Date(),
+			status: "healthy",
+			uptime: {
+				seconds: uptimeSeconds,
+				formatted: this.formatUptime(uptimeSeconds),
+			},
+			memory: {
+				heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+				heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+				rss: Math.round(memoryUsage.rss / 1024 / 1024),
+				unit: "MB",
+			},
+			node: {
+				version: process.version,
+				platform: process.platform,
+				arch: process.arch,
+			},
+		};
+	}
+
+	/**
+	 * Get security alerts
+	 * As per Specification 2A.4: Security monitoring
+	 */
+	async getSecurityAlerts(userId: string) {
+		await this.verifySupportRole(userId);
+
+		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+		const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+		// Get failed login attempts and suspicious activities
+		const [failedLogins, unauthorizedAccess, recentErrors] = await Promise.all([
+			this.prisma.auditLog.count({
+				where: {
+					action: { contains: "LOGIN_FAILED" },
+					createdAt: { gte: oneDayAgo },
+				},
+			}),
+			this.prisma.auditLog.count({
+				where: {
+					action: { contains: "UNAUTHORIZED" },
+					createdAt: { gte: oneDayAgo },
+				},
+			}),
+			this.prisma.auditLog.findMany({
+				where: {
+					OR: [
+						{ action: { contains: "ERROR" } },
+						{ action: { contains: "FAILED" } },
+						{ action: { contains: "UNAUTHORIZED" } },
+					],
+					createdAt: { gte: oneHourAgo },
+				},
+				include: {
+					user: {
+						select: { email: true },
+					},
+				},
+				orderBy: { createdAt: "desc" },
+				take: 20,
+			}),
+		]);
+
+		return {
+			timestamp: new Date(),
+			summary: {
+				failedLogins24h: failedLogins,
+				unauthorizedAccess24h: unauthorizedAccess,
+				errorsLastHour: recentErrors.length,
+			},
+			recentAlerts: recentErrors.map((log) => ({
+				id: log.id,
+				action: log.action,
+				userId: log.userId,
+				userEmail: log.user?.email,
+				details: log.details,
+				timestamp: log.createdAt,
+			})),
+		};
+	}
+
+	/**
+	 * Get database health
+	 * As per Specification 2A.4: Database maintenance
+	 */
+	async getDatabaseHealth(userId: string) {
+		await this.verifySupportRole(userId);
+
+		// Check database connectivity and basic stats
+		const startTime = Date.now();
+		await this.prisma.user.count();
+		const queryTime = Date.now() - startTime;
+
+		const dbStats = await this.getDatabaseStats(userId);
+
+		return {
+			timestamp: new Date(),
+			status:
+				queryTime < 1000 ? "healthy" : queryTime < 5000 ? "slow" : "critical",
+			responseTime: queryTime,
+			tables: dbStats.tables,
+		};
+	}
+
+	/**
+	 * Trigger maintenance task
+	 * As per Specification 2A.4: "Manage updates and system upgrades"
+	 */
+	async triggerMaintenance(userId: string, taskType: string, options?: string) {
+		await this.verifySupportRole(userId);
+
+		// Log the maintenance request
+		await this.prisma.auditLog.create({
+			data: {
+				userId,
+				action: `MAINTENANCE_TRIGGERED_${taskType.toUpperCase()}`,
+				details: options,
+			},
+		});
+
+		// Simulate maintenance task execution
+		const supportedTasks = [
+			"CLEANUP_OLD_LOGS",
+			"REINDEX_DATABASE",
+			"CLEAR_CACHE",
+			"HEALTH_CHECK",
+		];
+
+		if (!supportedTasks.includes(taskType.toUpperCase())) {
+			return {
+				success: false,
+				message: `Unknown task type: ${taskType}. Supported: ${supportedTasks.join(", ")}`,
+			};
+		}
+
+		return {
+			success: true,
+			taskType,
+			status: "queued",
+			message: `Maintenance task ${taskType} has been queued for execution`,
+			timestamp: new Date(),
+		};
+	}
+
+	private formatUptime(seconds: number): string {
+		const days = Math.floor(seconds / 86400);
+		const hours = Math.floor((seconds % 86400) / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const secs = Math.floor(seconds % 60);
+
+		const parts = [];
+		if (days > 0) parts.push(`${days}d`);
+		if (hours > 0) parts.push(`${hours}h`);
+		if (minutes > 0) parts.push(`${minutes}m`);
+		parts.push(`${secs}s`);
+
+		return parts.join(" ");
+	}
+
 	// ============================
 	// Helper Methods
 	// ============================
