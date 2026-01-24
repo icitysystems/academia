@@ -1,0 +1,20 @@
+{
+	"name": "academia-e2e",
+	"version": "1.0.0",
+	"description": "End-to-end tests for Academia platform",
+	"scripts": {
+		"test": "playwright test",
+		"test:headed": "playwright test --headed",
+		"test:ui": "playwright test --ui",
+		"test:debug": "playwright test --debug",
+		"test:report": "playwright show-report",
+		"test:auth": "playwright test tests/auth",
+		"test:grading": "playwright test tests/grading",
+		"test:courses": "playwright test tests/courses",
+		"codegen": "playwright codegen http://localhost:3000"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.41.0",
+		"@types/node": "^20.0.0"
+	}
+}

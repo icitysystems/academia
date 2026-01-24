@@ -5,6 +5,10 @@ import {
 	BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
+import {
+	TensorFlowInferenceService,
+	GradingPrediction,
+} from "./tensorflow-inference.service";
 
 export type Correctness = "CORRECT" | "PARTIAL" | "INCORRECT" | "SKIPPED";
 
@@ -28,8 +32,12 @@ export interface GradingJobResult {
 export class MLService {
 	private readonly logger = new Logger(MLService.name);
 	private confidenceThreshold = 0.7; // Below this, flag for review
+	private useTensorFlow = true; // Toggle for TensorFlow vs rule-based
 
-	constructor(private prisma: PrismaService) {}
+	constructor(
+		private prisma: PrismaService,
+		private tfInference: TensorFlowInferenceService,
+	) {}
 
 	/**
 	 * Grade a single sheet using the active model
@@ -66,13 +74,42 @@ export class MLService {
 		let totalScore = 0;
 		let maxScore = 0;
 
-		for (const region of sheet.template.regions) {
-			const regionOcr = ocrData[region.id] || {};
-			const prediction = await this.predictRegion(region, regionOcr, model);
+		// Use TensorFlow inference when enabled
+		if (this.useTensorFlow) {
+			this.logger.log(
+				`Grading sheet ${sheetId} using TensorFlow model ${modelId}`,
+			);
 
-			predictions.push(prediction);
-			totalScore += prediction.assignedScore;
-			maxScore += region.points;
+			for (const region of sheet.template.regions) {
+				const regionOcr = ocrData[region.id] || {};
+				const tfPrediction = await this.tfInference.predict(
+					modelId,
+					region,
+					regionOcr,
+					region.expectedAnswer,
+				);
+
+				predictions.push({
+					regionId: tfPrediction.regionId,
+					predictedCorrectness: tfPrediction.predictedCorrectness,
+					confidence: tfPrediction.confidence,
+					assignedScore: tfPrediction.assignedScore,
+					explanation: tfPrediction.explanation,
+					needsReview: tfPrediction.needsReview,
+				});
+				totalScore += tfPrediction.assignedScore;
+				maxScore += region.points;
+			}
+		} else {
+			// Fallback to legacy rule-based prediction
+			for (const region of sheet.template.regions) {
+				const regionOcr = ocrData[region.id] || {};
+				const prediction = await this.predictRegion(region, regionOcr, model);
+
+				predictions.push(prediction);
+				totalScore += prediction.assignedScore;
+				maxScore += region.points;
+			}
 		}
 
 		return {

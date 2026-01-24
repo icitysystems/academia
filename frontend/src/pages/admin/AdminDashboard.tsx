@@ -466,6 +466,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />
             <Tab icon={<SchoolIcon />} label="Course Catalog" iconPosition="start" />
             <Tab icon={<PaymentIcon />} label="Finance & Billing" iconPosition="start" />
+            <Tab icon={<SupportAgentIcon />} label="Support" iconPosition="start" />
             <Tab icon={<BarChartIcon />} label="Reports" iconPosition="start" />
             <Tab icon={<SettingsIcon />} label="Settings" iconPosition="start" />
           </Tabs>
@@ -896,8 +897,92 @@ const AdminDashboard: React.FC = () => {
           </Grid>
         </TabPanel>
 
-        {/* Tab: Reports */}
+        {/* Tab: Support */}
         <TabPanel value={tabValue} index={4}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Access the full Support Dashboard for ticket management, system monitoring, and troubleshooting tools.
+              </Alert>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: 'primary.light', mr: 2 }}>
+                      <SupportAgentIcon color="primary" />
+                    </Avatar>
+                    <Typography variant="h6">Support Dashboard</Typography>
+                  </Box>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Manage support tickets, view system health, and monitor error logs.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    component={RouterLink}
+                    to="/admin/support"
+                    startIcon={<SupportAgentIcon />}
+                  >
+                    Open Support Dashboard
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: 'warning.light', mr: 2 }}>
+                      <SecurityIcon color="warning" />
+                    </Avatar>
+                    <Typography variant="h6">System Monitoring</Typography>
+                  </Box>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    View server status, security alerts, and audit logs for the platform.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    component={RouterLink}
+                    to="/admin/support"
+                    startIcon={<SecurityIcon />}
+                  >
+                    View System Metrics
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: 'error.light', mr: 2 }}>
+                      <WarningIcon color="error" />
+                    </Avatar>
+                    <Typography variant="h6">Error Logs</Typography>
+                  </Box>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Troubleshoot issues by reviewing error logs and system events.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    fullWidth
+                    component={RouterLink}
+                    to="/admin/support"
+                    startIcon={<WarningIcon />}
+                  >
+                    View Error Logs
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* Tab: Reports */}
+        <TabPanel value={tabValue} index={5}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 3 }}>
@@ -978,7 +1063,7 @@ const AdminDashboard: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Settings */}
-        <TabPanel value={tabValue} index={5}>
+        <TabPanel value={tabValue} index={6}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 3 }}>

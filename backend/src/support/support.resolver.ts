@@ -1,5 +1,5 @@
-﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql"
-import { GraphQLJSON } from 'graphql-type-json';
+﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
+import { GraphQLJSON } from "graphql-type-json";
 import { UseGuards } from "@nestjs/common";
 import { SupportService } from "./support.service";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -7,7 +7,7 @@ import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { UserRole } from "../common/types";
-
+import { AuditLogOptionsInput } from "./dto/audit-log-options.input";
 /**
  * Support Resolver
  * Implements support ticket endpoints as per Specification Section 2A.4
@@ -191,6 +191,37 @@ export class SupportResolver {
 	}
 
 	/**
+	 * Get comprehensive system metrics
+	 * As per Spec 2A.4: "Maintain servers, databases, and security protocols"
+	 */
+	@Query(() => GraphQLJSON, { name: "systemMetrics" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getSystemMetrics(@CurrentUser() user: any) {
+		return this.supportService.getSystemMetrics(user.sub);
+	}
+
+	/**
+	 * Get audit logs with filtering
+	 * As per Spec 2A.4: System monitoring and logging
+	 */
+	@Query(() => GraphQLJSON, { name: "auditLogs" })
+	@Roles(UserRole.SUPPORT_STAFF, UserRole.ADMIN)
+	async getAuditLogs(
+		@CurrentUser() user: any,
+		@Args("options", { nullable: true }) options?: AuditLogOptionsInput,
+	) {
+		return this.supportService.getAuditLogs(user.sub, {
+			userId: options?.userId,
+			action: options?.action,
+			entityType: options?.entityType,
+			startDate: options?.startDate ? new Date(options.startDate) : undefined,
+			endDate: options?.endDate ? new Date(options.endDate) : undefined,
+			limit: options?.limit || 50,
+			offset: options?.offset || 0,
+		});
+	}
+
+	/**
 	 * Get security alerts
 	 * As per Spec 2A.4: "Monitor system performance and uptime"
 	 */
@@ -223,5 +254,3 @@ export class SupportResolver {
 		return this.supportService.triggerMaintenance(user.sub, taskType, options);
 	}
 }
-
-
