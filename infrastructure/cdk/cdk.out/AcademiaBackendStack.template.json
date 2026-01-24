@@ -34,7 +34,14 @@
   "AcademiaVpcPublicSubnet1Subnet055F80CF": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1a",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.0.0/24",
     "MapPublicIpOnLaunch": true,
     "Tags": [
@@ -201,7 +208,14 @@
   "AcademiaVpcPublicSubnet2Subnet638E1B97": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1b",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.1.0/24",
     "MapPublicIpOnLaunch": true,
     "Tags": [
@@ -302,7 +316,14 @@
   "AcademiaVpcPrivateSubnet1SubnetAE8E27DA": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1a",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.2.0/24",
     "MapPublicIpOnLaunch": false,
     "Tags": [
@@ -400,7 +421,14 @@
   "AcademiaVpcPrivateSubnet2Subnet5D70D0B2": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1b",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.3.0/24",
     "MapPublicIpOnLaunch": false,
     "Tags": [
@@ -498,7 +526,14 @@
   "AcademiaVpcIsolatedSubnet1Subnet23D5A1B3": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1a",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.4.0/24",
     "MapPublicIpOnLaunch": false,
     "Tags": [
@@ -581,7 +616,14 @@
   "AcademiaVpcIsolatedSubnet2SubnetEAD6AC37": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
-    "AvailabilityZone": "us-east-1b",
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
     "CidrBlock": "10.0.5.0/24",
     "MapPublicIpOnLaunch": false,
     "Tags": [
@@ -956,7 +998,17 @@
       }
      ]
     },
-    "BucketName": "academia-assets-771643347382",
+    "BucketName": {
+     "Fn::Join": [
+      "",
+      [
+       "academia-assets-",
+       {
+        "Ref": "AWS::AccountId"
+       }
+      ]
+     ]
+    },
     "CorsConfiguration": {
      "CorsRules": [
       {
@@ -1602,7 +1654,11 @@
        {
         "Ref": "AWS::Partition"
        },
-       ":execute-api:us-east-1:771643347382:",
+       ":execute-api:us-east-1:",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
        {
         "Ref": "AcademiaApiEB0FBB35"
        },

@@ -1,18 +1,18 @@
 {
   "version": "48.0.0",
   "files": {
-    "45e54099fe78fc5ec99fd8f23129079e94a36eb8f75191d34ea6561f0165f526": {
+    "4b2e06d2974f18b3d2c1f231b1cac1c0f2104453748d553c78b3f640ba62914a": {
       "displayName": "AcademiaBackendStack Template",
       "source": {
         "path": "AcademiaBackendStack.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "771643347382-us-east-1-1da1a3bb": {
-          "bucketName": "cdk-hnb659fds-assets-771643347382-us-east-1",
-          "objectKey": "45e54099fe78fc5ec99fd8f23129079e94a36eb8f75191d34ea6561f0165f526.json",
+        "current_account-us-east-1-87a3cee9": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "4b2e06d2974f18b3d2c1f231b1cac1c0f2104453748d553c78b3f640ba62914a.json",
           "region": "us-east-1",
-          "assumeRoleArn": "arn:${AWS::Partition}:iam::771643347382:role/cdk-hnb659fds-file-publishing-role-771643347382-us-east-1"
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
         }
       }
     }

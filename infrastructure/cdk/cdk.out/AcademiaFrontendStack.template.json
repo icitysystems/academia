@@ -13,7 +13,17 @@
       }
      ]
     },
-    "BucketName": "academia-frontend-771643347382",
+    "BucketName": {
+     "Fn::Join": [
+      "",
+      [
+       "academia-frontend-",
+       {
+        "Ref": "AWS::AccountId"
+       }
+      ]
+     ]
+    },
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
