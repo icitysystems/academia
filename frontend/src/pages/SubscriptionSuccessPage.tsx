@@ -9,8 +9,8 @@ const SubscriptionSuccessPage: React.FC = () => {
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
-    // You could verify the session here with your backend if needed
-    console.log('Checkout session completed:', sessionId);
+    // Session verification could be added here if needed
+    // The sessionId is available for backend verification
   }, [sessionId]);
 
   return (

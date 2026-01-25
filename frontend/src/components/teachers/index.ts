@@ -1,0 +1,1 @@
+export { TopRatedTeachers } from "./TopRatedTeachers";

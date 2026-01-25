@@ -15,11 +15,15 @@ import {
   alpha,
   Avatar,
   Rating,
-  Divider
+  Divider,
+  Skeleton,
+  CircularProgress
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { useQuery } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
 import NewsletterForm from '../components/NewsletterForm';
+import { GET_HOMEPAGE_DATA } from '../graphql/queries';
 
 // Icons
 import SchoolIcon from '@mui/icons-material/School';
@@ -38,87 +42,160 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 
-// Featured Courses Data
-const featuredCourses = [
+// Fallback data for when API is unavailable
+const fallbackFeaturedCourses = [
   {
-    id: 1,
+    id: '1',
     title: 'Full Stack Web Development',
     instructor: 'Dr. Sarah Mitchell',
     rating: 4.8,
     students: 2340,
     duration: '40 hours',
-    image: '🖥️',
+    thumbnailUrl: null,
     category: 'Technology',
     price: 'Free'
   },
   {
-    id: 2,
+    id: '2',
     title: 'Data Science & Machine Learning',
     instructor: 'Prof. James Chen',
     rating: 4.9,
     students: 1856,
     duration: '52 hours',
-    image: '📊',
+    thumbnailUrl: null,
     category: 'Data Science',
     price: '$49.99'
   },
   {
-    id: 3,
+    id: '3',
     title: 'Business Analytics Fundamentals',
     instructor: 'Dr. Emily Roberts',
     rating: 4.7,
     students: 3120,
     duration: '28 hours',
-    image: '📈',
+    thumbnailUrl: null,
     category: 'Business',
     price: '$29.99'
   },
   {
-    id: 4,
+    id: '4',
     title: 'Educational Psychology',
     instructor: 'Prof. Michael Torres',
     rating: 4.6,
     students: 1420,
     duration: '24 hours',
-    image: '🧠',
+    thumbnailUrl: null,
     category: 'Education',
     price: 'Free'
   }
 ];
 
-// Testimonials Data
-const testimonials = [
+const fallbackTestimonials = [
   {
+    id: '1',
     name: 'Jennifer Adams',
     role: 'High School Teacher',
     content: 'Academia has transformed how I create and deliver my courses. The ML grading system saves me hours every week!',
-    avatar: 'JA',
+    avatarUrl: null,
     rating: 5
   },
   {
+    id: '2',
     name: 'Mark Thompson',
     role: 'University Professor',
     content: 'The integrated platform makes it easy to manage everything from course creation to certification in one place.',
-    avatar: 'MT',
+    avatarUrl: null,
     rating: 5
   },
   {
+    id: '3',
     name: 'Lisa Chen',
     role: 'Online Student',
     content: 'I completed my certification entirely online. The learning experience was engaging and the support was excellent.',
-    avatar: 'LC',
+    avatarUrl: null,
     rating: 5
   }
 ];
+
+const fallbackStats = {
+  totalCourses: 500,
+  totalStudents: 25000,
+  totalInstructors: 8000,
+  completionRate: 98
+};
+
+// Get emoji icon based on category
+const getCategoryIcon = (category: string) => {
+  const icons: { [key: string]: string } = {
+    'Technology': '🖥️',
+    'Data Science': '📊',
+    'Business': '📈',
+    'Education': '🧠',
+    'Science': '🔬',
+    'Arts': '🎨',
+    'Language': '📚',
+    'Health': '💊',
+    'default': '📖'
+  };
+  return icons[category] || icons['default'];
+};
 
 const HomePage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const theme = useTheme();
 
+  // Fetch homepage data from API
+  const { data, loading } = useQuery(GET_HOMEPAGE_DATA, {
+    fetchPolicy: 'cache-first',
+    errorPolicy: 'all',
+  });
+
+  // Use API data or fallback to defaults
+  const featuredCourses = data?.homepageData?.featuredCourses?.length > 0 
+    ? data.homepageData.featuredCourses 
+    : fallbackFeaturedCourses;
+  
+  const testimonials = data?.homepageData?.testimonials?.length > 0 
+    ? data.homepageData.testimonials 
+    : fallbackTestimonials;
+  
+  const stats = data?.homepageData?.stats || fallbackStats;
+
   return (
-    <Box sx={{ bgcolor: '#fafafa' }}>
+    <Box sx={{ bgcolor: '#fafafa' }} role="main" aria-label="Academia Home Page">
+      {/* Skip to main content link for keyboard users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 'auto',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+          zIndex: 9999,
+          '&:focus': {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: 'auto',
+            height: 'auto',
+            padding: '16px 32px',
+            backgroundColor: theme.palette.primary.main,
+            color: 'white',
+            textDecoration: 'none',
+            fontWeight: 600,
+          }
+        }}
+      >
+        Skip to main content
+      </Box>
+
       {/* Hero Section - Professional University Landing */}
       <Box 
+        component="section"
+        aria-labelledby="hero-title"
         sx={{ 
           background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, #1a237e 50%, ${theme.palette.secondary.dark} 100%)`,
           color: 'white',
@@ -144,6 +221,7 @@ const HomePage: React.FC = () => {
                 <Chip 
                   icon={<VerifiedIcon sx={{ color: 'white !important' }} />}
                   label="Accredited Online Learning Platform" 
+                  aria-label="Academia is an accredited online learning platform"
                   sx={{ 
                     bgcolor: alpha('#fff', 0.15), 
                     color: 'white', 
@@ -304,7 +382,9 @@ const HomePage: React.FC = () => {
                       <SchoolIcon fontSize="large" />
                     </Avatar>
                     <Box>
-                      <Typography variant="h3" fontWeight="800">500+</Typography>
+                      <Typography variant="h3" fontWeight="800">
+                        {loading ? <Skeleton width={80} /> : `${stats.totalCourses}+`}
+                      </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.8 }}>Professional Courses</Typography>
                     </Box>
                   </Box>
@@ -314,7 +394,9 @@ const HomePage: React.FC = () => {
                       <GroupsIcon fontSize="large" />
                     </Avatar>
                     <Box>
-                      <Typography variant="h3" fontWeight="800">25K+</Typography>
+                      <Typography variant="h3" fontWeight="800">
+                        {loading ? <Skeleton width={80} /> : `${(stats.totalStudents / 1000).toFixed(0)}K+`}
+                      </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.8 }}>Active Learners</Typography>
                     </Box>
                   </Box>
@@ -324,7 +406,9 @@ const HomePage: React.FC = () => {
                       <WorkspacePremiumIcon fontSize="large" />
                     </Avatar>
                     <Box>
-                      <Typography variant="h3" fontWeight="800">8K+</Typography>
+                      <Typography variant="h3" fontWeight="800">
+                        {loading ? <Skeleton width={80} /> : `${(stats.totalInstructors / 1000).toFixed(0)}K+`}
+                      </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.8 }}>Certificates Issued</Typography>
                     </Box>
                   </Box>
@@ -334,7 +418,9 @@ const HomePage: React.FC = () => {
                       <EmojiEventsIcon fontSize="large" />
                     </Avatar>
                     <Box>
-                      <Typography variant="h3" fontWeight="800">98%</Typography>
+                      <Typography variant="h3" fontWeight="800">
+                        {loading ? <Skeleton width={80} /> : `${stats.completionRate}%`}
+                      </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.8 }}>Satisfaction Rate</Typography>
                     </Box>
                   </Box>
@@ -367,90 +453,113 @@ const HomePage: React.FC = () => {
         </Box>
         
         <Grid container spacing={3}>
-          {featuredCourses.map((course) => (
-            <Grid item xs={12} sm={6} md={3} key={course.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  borderRadius: 3,
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-                  }
-                }}
-              >
-                <Box 
+          {loading ? (
+            // Loading skeletons
+            [...Array(4)].map((_, index) => (
+              <Grid item xs={12} sm={6} md={3} key={index}>
+                <Card sx={{ height: '100%', borderRadius: 3 }}>
+                  <Skeleton variant="rectangular" height={140} />
+                  <CardContent>
+                    <Skeleton variant="text" height={28} />
+                    <Skeleton variant="text" width="60%" />
+                    <Skeleton variant="text" width="40%" />
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          ) : (
+            featuredCourses.map((course: any) => (
+              <Grid item xs={12} sm={6} md={3} key={course.id}>
+                <Card 
                   sx={{ 
-                    bgcolor: 'primary.light', 
-                    py: 4, 
-                    textAlign: 'center',
-                    position: 'relative'
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+                    }
                   }}
                 >
-                  <Typography sx={{ fontSize: '4rem' }}>{course.image}</Typography>
-                  <Chip 
-                    label={course.category} 
-                    size="small" 
+                  <Box 
                     sx={{ 
-                      position: 'absolute', 
-                      top: 12, 
-                      left: 12,
-                      bgcolor: 'white',
-                      fontWeight: 600
-                    }} 
-                  />
-                  {course.price === 'Free' && (
+                      bgcolor: 'primary.light', 
+                      py: 4, 
+                      textAlign: 'center',
+                      position: 'relative',
+                      backgroundImage: course.thumbnailUrl ? `url(${course.thumbnailUrl})` : 'none',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  >
+                    {!course.thumbnailUrl && (
+                      <Typography sx={{ fontSize: '4rem' }}>
+                        {getCategoryIcon(course.category)}
+                      </Typography>
+                    )}
                     <Chip 
-                      label="FREE" 
+                      label={course.category} 
                       size="small" 
-                      color="success"
                       sx={{ 
                         position: 'absolute', 
                         top: 12, 
-                        right: 12,
-                        fontWeight: 700
+                        left: 12,
+                        bgcolor: 'white',
+                        fontWeight: 600
                       }} 
                     />
-                  )}
-                </Box>
-                <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ lineHeight: 1.3 }}>
-                    {course.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {course.instructor}
-                  </Typography>
-                  <Box display="flex" alignItems="center" gap={0.5} mb={1}>
-                    <Rating value={course.rating} precision={0.1} size="small" readOnly />
-                    <Typography variant="body2" fontWeight="bold">{course.rating}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      ({course.students.toLocaleString()})
-                    </Typography>
+                    {course.price === 'Free' && (
+                      <Chip 
+                        label="FREE" 
+                        size="small" 
+                        color="success"
+                        sx={{ 
+                          position: 'absolute', 
+                          top: 12, 
+                          right: 12,
+                          fontWeight: 700
+                        }} 
+                      />
+                    )}
                   </Box>
-                  <Box display="flex" alignItems="center" gap={0.5}>
-                    <AccessTimeIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.secondary">
-                      {course.duration}
+                  <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ lineHeight: 1.3 }}>
+                      {course.title}
                     </Typography>
-                  </Box>
-                </CardContent>
-                <CardActions sx={{ p: 3, pt: 0 }}>
-                  <Button 
-                    variant="contained" 
-                    fullWidth
-                    component={RouterLink}
-                    to={`/university/courses/${course.id}`}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    {course.price === 'Free' ? 'Enroll Free' : `Enroll - ${course.price}`}
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      {course.instructor}
+                    </Typography>
+                    <Box display="flex" alignItems="center" gap={0.5} mb={1}>
+                      <Rating value={course.rating} precision={0.1} size="small" readOnly />
+                      <Typography variant="body2" fontWeight="bold">{course.rating?.toFixed(1)}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        ({(course.students || 0).toLocaleString()})
+                      </Typography>
+                    </Box>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <AccessTimeIcon fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        {course.duration}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                  <CardActions sx={{ p: 3, pt: 0 }}>
+                    <Button 
+                      variant="contained" 
+                      fullWidth
+                      component={RouterLink}
+                      to={`/university/courses/${course.id}`}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {course.price === 'Free' ? 'Enroll Free' : `Enroll - ${course.price}`}
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))
+          )}
         </Grid>
         
         <Box textAlign="center" mt={4} sx={{ display: { xs: 'block', sm: 'none' } }}>
@@ -849,41 +958,65 @@ const HomePage: React.FC = () => {
         </Box>
         
         <Grid container spacing={4}>
-          {testimonials.map((testimonial, index) => (
-            <Grid item xs={12} md={4} key={index}>
-              <Paper 
-                elevation={0}
-                sx={{ 
-                  p: 4, 
-                  height: '100%', 
-                  borderRadius: 4,
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    borderColor: 'primary.light',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.08)'
-                  }
-                }}
-              >
-                <Rating value={testimonial.rating} readOnly sx={{ mb: 2 }} />
-                <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.8, fontStyle: 'italic' }}>
-                  "{testimonial.content}"
-                </Typography>
-                <Box display="flex" alignItems="center" gap={2}>
-                  <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 'bold' }}>
-                    {testimonial.avatar}
-                  </Avatar>
-                  <Box>
-                    <Typography fontWeight="bold">{testimonial.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {testimonial.role}
-                    </Typography>
+          {loading ? (
+            // Loading skeletons for testimonials
+            [...Array(3)].map((_, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Paper elevation={0} sx={{ p: 4, height: '100%', borderRadius: 4, border: '1px solid', borderColor: 'grey.200' }}>
+                  <Skeleton variant="rectangular" height={24} width={120} sx={{ mb: 2 }} />
+                  <Skeleton variant="text" />
+                  <Skeleton variant="text" />
+                  <Skeleton variant="text" width="80%" />
+                  <Box display="flex" alignItems="center" gap={2} mt={3}>
+                    <Skeleton variant="circular" width={40} height={40} />
+                    <Box>
+                      <Skeleton variant="text" width={100} />
+                      <Skeleton variant="text" width={80} />
+                    </Box>
                   </Box>
-                </Box>
-              </Paper>
-            </Grid>
-          ))}
+                </Paper>
+              </Grid>
+            ))
+          ) : (
+            testimonials.map((testimonial: any) => (
+              <Grid item xs={12} md={4} key={testimonial.id}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 4, 
+                    height: '100%', 
+                    borderRadius: 4,
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      borderColor: 'primary.light',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.08)'
+                    }
+                  }}
+                >
+                  <Rating value={testimonial.rating} readOnly sx={{ mb: 2 }} />
+                  <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.8, fontStyle: 'italic' }}>
+                    "{testimonial.content}"
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Avatar 
+                      src={testimonial.avatarUrl} 
+                      sx={{ bgcolor: 'primary.main', fontWeight: 'bold' }}
+                    >
+                      {testimonial.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                    </Avatar>
+                    <Box>
+                      <Typography fontWeight="bold">{testimonial.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {testimonial.role}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+              </Grid>
+            ))
+          )}
         </Grid>
       </Container>
 

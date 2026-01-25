@@ -1,0 +1,1 @@
+export { AlumniPortal } from "./AlumniPortal";

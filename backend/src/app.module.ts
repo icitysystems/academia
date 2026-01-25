@@ -2,7 +2,9 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { join } from "path";
+import depthLimit from "graphql-depth-limit";
 import { PrismaService } from "./prisma.service";
 import { AuthModule } from "./auth/auth.module";
 import { TemplatesModule } from "./templates/templates.module";
@@ -28,6 +30,14 @@ import { DiscussionsModule } from "./discussions/discussions.module";
 import { AlumniModule } from "./alumni/alumni.module";
 import { ComplianceModule } from "./compliance/compliance.module";
 import { ParentModule } from "./parent/parent.module";
+import { CalendarModule } from "./calendar/calendar.module";
+import { MessagingModule } from "./messaging/messaging.module";
+import { LMSModule } from "./lms/lms.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { LiveSessionsModule } from "./live-sessions/live-sessions.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
+import { HomepageModule } from "./homepage/homepage.module";
+import { AuditModule } from "./audit/audit.module";
 import configuration from "./config/configuration";
 
 @Module({
@@ -37,6 +47,24 @@ import configuration from "./config/configuration";
 			load: [configuration],
 			envFilePath: [".env.local", ".env"],
 		}),
+		// Rate limiting for GraphQL mutations
+		ThrottlerModule.forRoot([
+			{
+				name: "short",
+				ttl: 1000, // 1 second
+				limit: 10, // 10 requests per second
+			},
+			{
+				name: "medium",
+				ttl: 60000, // 1 minute
+				limit: 100, // 100 requests per minute
+			},
+			{
+				name: "long",
+				ttl: 3600000, // 1 hour
+				limit: 1000, // 1000 requests per hour
+			},
+		]),
 		GraphQLModule.forRootAsync<ApolloDriverConfig>({
 			driver: ApolloDriver,
 			imports: [ConfigModule],
@@ -48,6 +76,8 @@ import configuration from "./config/configuration";
 					true,
 				),
 				context: ({ req, res }) => ({ req, res }),
+				// Security: Limit query depth to prevent deeply nested malicious queries
+				validationRules: [depthLimit(10)],
 				formatError: (error) => {
 					// Don't expose internal errors in production
 					const isProduction =
@@ -90,6 +120,14 @@ import configuration from "./config/configuration";
 		AlumniModule,
 		ComplianceModule,
 		ParentModule,
+		CalendarModule,
+		MessagingModule,
+		LMSModule,
+		NotificationsModule,
+		LiveSessionsModule,
+		AnalyticsModule,
+		HomepageModule,
+		AuditModule,
 	],
 	providers: [PrismaService],
 	exports: [PrismaService],

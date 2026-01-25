@@ -72,6 +72,21 @@ import {
 // Grading Pages
 import { GradingDashboard, ExamPaperBuilder, GradingReview } from './pages/Grading';
 
+// New Feature Components
+import AssignmentUpload from './components/assignments/AssignmentUpload';
+import DiscussionBoard from './components/discussions/DiscussionBoard';
+import QuizTaker from './components/quiz/QuizTaker';
+import NotificationCenter from './components/notifications/NotificationCenter';
+import CertificateViewer from './components/certificates/CertificateViewer';
+import { StudentGradebook, InstructorGradebook } from './components/gradebook/Gradebook';
+import LiveSession from './components/livesession/LiveSession';
+import { StudentAnalytics, CourseAnalytics } from './components/analytics/LearningAnalytics';
+import UserManagement from './components/users/UserManagement';
+import { StudentLessonProgress, InstructorProgressReport } from './components/progress/LessonProgress';
+
+// Monitoring
+import { MonitoringProvider, MonitoredErrorBoundary } from './monitoring/MonitoringProvider';
+
 // Professional University Theme
 const theme = createTheme({
   palette: {
@@ -207,8 +222,46 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppContent: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* Skip to main content link for keyboard users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 'auto',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+          zIndex: 9999,
+          '&:focus': {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: 'auto',
+            height: 'auto',
+            padding: '16px 32px',
+            backgroundColor: 'primary.main',
+            color: 'white',
+            textDecoration: 'none',
+            fontWeight: 600,
+            fontSize: '1rem',
+            borderRadius: '0 0 4px 0',
+            boxShadow: 2,
+          }
+        }}
+      >
+        Skip to main content
+      </Box>
       <Navbar />
-      <Box component="main" sx={{ flexGrow: 1, pb: 4 }}>
+      <Box 
+        component="main" 
+        id="main-content"
+        tabIndex={-1}
+        sx={{ flexGrow: 1, pb: 4, outline: 'none' }}
+        role="main"
+        aria-label="Main content"
+      >
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -675,6 +728,120 @@ const AppContent: React.FC = () => {
             }
           />
           
+          {/* Assignment Routes */}
+          <Route
+            path="/university/courses/:courseId/assignments/:assignmentId"
+            element={
+              <ProtectedRoute>
+                <AssignmentUpload />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Discussion Routes */}
+          <Route
+            path="/university/courses/:courseId/discussions"
+            element={
+              <ProtectedRoute>
+                <DiscussionBoard />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Quiz Routes */}
+          <Route
+            path="/university/courses/:courseId/quizzes/:quizId"
+            element={
+              <ProtectedRoute>
+                <QuizTaker />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Certificate Routes */}
+          <Route
+            path="/university/certificates"
+            element={
+              <ProtectedRoute>
+                <CertificateViewer />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Gradebook Routes */}
+          <Route
+            path="/university/gradebook"
+            element={
+              <ProtectedRoute>
+                <StudentGradebook />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/instructor/courses/:courseId/gradebook"
+            element={
+              <ProtectedRoute>
+                <InstructorGradebook />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Live Session Routes */}
+          <Route
+            path="/university/sessions/:sessionId"
+            element={
+              <ProtectedRoute>
+                <LiveSession />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Analytics Routes */}
+          <Route
+            path="/university/analytics"
+            element={
+              <ProtectedRoute>
+                <StudentAnalytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/instructor/courses/:courseId/analytics"
+            element={
+              <ProtectedRoute>
+                <CourseAnalytics />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Progress Tracking Routes */}
+          <Route
+            path="/university/courses/:courseId/progress"
+            element={
+              <ProtectedRoute>
+                <StudentLessonProgress />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/instructor/courses/:courseId/progress"
+            element={
+              <ProtectedRoute>
+                <InstructorProgressReport />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Admin User Management */}
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -686,13 +853,26 @@ const AppContent: React.FC = () => {
 // Main App Component
 export default function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </BrowserRouter>
-    </ThemeProvider>
+    <MonitoringProvider
+      config={{
+        enabled: process.env.NODE_ENV === 'production',
+        endpoint: process.env.REACT_APP_MONITORING_ENDPOINT || '/api/monitoring',
+        sampleRate: 0.1,
+        enableCoreWebVitals: true,
+        enableErrorTracking: true,
+        enableUserInteractions: true,
+      }}
+    >
+      <MonitoredErrorBoundary>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <BrowserRouter>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </MonitoredErrorBoundary>
+    </MonitoringProvider>
   );
 }

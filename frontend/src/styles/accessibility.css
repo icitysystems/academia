@@ -1,0 +1,360 @@
+/* Academia Accessibility Styles */
+
+/* Screen Reader Only - visually hidden but accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus visible styles */
+.focus-visible *:focus-visible {
+  outline: 3px solid #1976d2 !important;
+  outline-offset: 2px !important;
+}
+
+.focus-visible button:focus-visible,
+.focus-visible a:focus-visible,
+.focus-visible input:focus-visible,
+.focus-visible select:focus-visible,
+.focus-visible textarea:focus-visible,
+.focus-visible [tabindex]:focus-visible {
+  outline: 3px solid #1976d2 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.2) !important;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --background-primary: #000000;
+  --background-secondary: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --border-color: #ffffff;
+  --link-color: #00d4ff;
+  --error-color: #ff6b6b;
+  --success-color: #00ff88;
+  --warning-color: #ffff00;
+}
+
+.high-contrast body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .MuiPaper-root {
+  background-color: #1a1a1a !important;
+  border: 2px solid #ffffff !important;
+}
+
+.high-contrast .MuiButton-root {
+  border: 2px solid currentColor !important;
+}
+
+.high-contrast .MuiButton-contained {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast .MuiButton-outlined {
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .MuiTypography-root {
+  color: #ffffff !important;
+}
+
+.high-contrast .MuiTypography-colorTextSecondary {
+  color: #e0e0e0 !important;
+}
+
+.high-contrast a {
+  color: #00d4ff !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast .MuiInputBase-root {
+  border: 2px solid #ffffff !important;
+  background-color: #1a1a1a !important;
+}
+
+.high-contrast .MuiInputBase-input {
+  color: #ffffff !important;
+}
+
+.high-contrast .MuiFormLabel-root {
+  color: #ffffff !important;
+}
+
+.high-contrast .MuiCard-root {
+  border: 2px solid #ffffff !important;
+}
+
+.high-contrast .MuiChip-root {
+  border: 1px solid #ffffff !important;
+}
+
+.high-contrast .MuiTableCell-root {
+  border-color: #ffffff !important;
+}
+
+.high-contrast .MuiDivider-root {
+  border-color: #ffffff !important;
+}
+
+/* Large Text Mode */
+.large-text {
+  font-size: 125% !important;
+}
+
+.large-text body {
+  font-size: 1.125rem !important;
+  line-height: 1.7 !important;
+}
+
+.large-text .MuiTypography-h1 {
+  font-size: 3.5rem !important;
+}
+
+.large-text .MuiTypography-h2 {
+  font-size: 3rem !important;
+}
+
+.large-text .MuiTypography-h3 {
+  font-size: 2.5rem !important;
+}
+
+.large-text .MuiTypography-h4 {
+  font-size: 2rem !important;
+}
+
+.large-text .MuiTypography-h5 {
+  font-size: 1.75rem !important;
+}
+
+.large-text .MuiTypography-h6 {
+  font-size: 1.5rem !important;
+}
+
+.large-text .MuiTypography-body1 {
+  font-size: 1.25rem !important;
+}
+
+.large-text .MuiTypography-body2 {
+  font-size: 1.125rem !important;
+}
+
+.large-text .MuiButton-root {
+  font-size: 1.125rem !important;
+  padding: 12px 24px !important;
+}
+
+.large-text .MuiChip-root {
+  font-size: 1rem !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+}
+
+.large-text .MuiInputBase-input {
+  font-size: 1.125rem !important;
+  padding: 14px !important;
+}
+
+/* Reduced Motion */
+.reduced-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+.reduced-motion .MuiCollapse-root {
+  transition: none !important;
+}
+
+.reduced-motion .MuiFade-root {
+  transition: none !important;
+}
+
+.reduced-motion .MuiSlide-root {
+  transition: none !important;
+}
+
+.reduced-motion .MuiGrow-root {
+  transition: none !important;
+}
+
+.reduced-motion .MuiZoom-root {
+  transition: none !important;
+}
+
+/* Keyboard navigation enhancement */
+.keyboard-navigation [tabindex="0"]:focus {
+  outline: 3px solid #1976d2;
+  outline-offset: 2px;
+}
+
+/* Skip link styling */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 9999;
+  padding: 1rem;
+  background-color: #1976d2;
+  color: white;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  left: 0;
+  top: 0;
+}
+
+/* Focus trap outline */
+[role="dialog"]:focus {
+  outline: none;
+}
+
+/* Improved touch targets for mobile (WCAG 2.5.5) */
+@media (pointer: coarse) {
+  button,
+  a,
+  input,
+  select,
+  [role="button"],
+  [role="link"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Print styles for accessibility */
+@media print {
+  .sr-only,
+  [aria-hidden="true"] {
+    display: none !important;
+  }
+  
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+  
+  abbr[title]::after {
+    content: " (" attr(title) ")";
+  }
+}
+
+/* Loading state indicators */
+[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+/* Error state styling */
+[aria-invalid="true"] {
+  border-color: #d32f2f !important;
+}
+
+[aria-invalid="true"]:focus {
+  outline-color: #d32f2f !important;
+}
+
+/* Required field indicator */
+[aria-required="true"]::after {
+  content: " *";
+  color: #d32f2f;
+}
+
+/* Disabled state */
+[aria-disabled="true"],
+[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Live region styling */
+[aria-live="polite"],
+[aria-live="assertive"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Selection styling for high contrast */
+.high-contrast ::selection {
+  background-color: #00d4ff;
+  color: #000000;
+}
+
+/* Ensure proper color contrast for links in high contrast mode */
+.high-contrast a:visited {
+  color: #ff99ff !important;
+}
+
+.high-contrast a:hover {
+  color: #ffffff !important;
+  background-color: #00d4ff !important;
+}
+
+/* Form validation styling */
+.high-contrast .MuiFormHelperText-root.Mui-error {
+  color: #ff6b6b !important;
+}
+
+.high-contrast .MuiInputBase-root.Mui-error {
+  border-color: #ff6b6b !important;
+}
+
+/* Icon accessibility */
+.high-contrast .MuiSvgIcon-root {
+  fill: currentColor !important;
+}
+
+/* Table accessibility */
+.high-contrast th {
+  background-color: #333333 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast tr:nth-child(even) {
+  background-color: #222222 !important;
+}
+
+/* Alert/notification accessibility */
+.high-contrast .MuiAlert-root {
+  border: 2px solid currentColor !important;
+}
+
+.high-contrast .MuiAlert-standardError {
+  background-color: #1a0000 !important;
+  border-color: #ff6b6b !important;
+}
+
+.high-contrast .MuiAlert-standardSuccess {
+  background-color: #001a00 !important;
+  border-color: #00ff88 !important;
+}
+
+.high-contrast .MuiAlert-standardWarning {
+  background-color: #1a1a00 !important;
+  border-color: #ffff00 !important;
+}
+
+.high-contrast .MuiAlert-standardInfo {
+  background-color: #001a1a !important;
+  border-color: #00d4ff !important;
+}

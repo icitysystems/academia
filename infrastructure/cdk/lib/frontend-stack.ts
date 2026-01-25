@@ -7,12 +7,14 @@ import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
+import { EnvironmentConfig } from "./config/environments";
 
 export interface AcademiaFrontendStackProps extends cdk.StackProps {
 	domainName: string;
 	subdomain: string;
 	apiUrl: string;
 	hostedZoneId?: string;
+	environmentConfig?: EnvironmentConfig;
 }
 
 export class AcademiaFrontendStack extends cdk.Stack {
@@ -23,6 +25,8 @@ export class AcademiaFrontendStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props: AcademiaFrontendStackProps) {
 		super(scope, id, props);
 
+		const envConfig = props.environmentConfig;
+		const envName = envConfig?.name || "production";
 		const fullDomain = `${props.subdomain}.${props.domainName}`;
 
 		// Hosted Zone - use ID if provided
@@ -50,11 +54,14 @@ export class AcademiaFrontendStack extends cdk.Stack {
 
 		// S3 Bucket for Frontend
 		this.bucket = new s3.Bucket(this, "FrontendBucket", {
-			bucketName: `academia-frontend-${this.account}`,
+			bucketName: `academia-frontend-${envName}-${this.account}`,
 			blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
 			encryption: s3.BucketEncryption.S3_MANAGED,
 			versioned: true,
-			removalPolicy: cdk.RemovalPolicy.RETAIN,
+			removalPolicy:
+				envName === "production"
+					? cdk.RemovalPolicy.RETAIN
+					: cdk.RemovalPolicy.DESTROY,
 		});
 
 		// CloudFront Origin Access Identity
@@ -157,11 +164,13 @@ export class AcademiaFrontendStack extends cdk.Stack {
 				? `https://${fullDomain}`
 				: `https://${this.distribution.distributionDomainName}`,
 			description: "Frontend URL",
+			exportName: `academia-${envName}-frontend-url`,
 		});
 
 		new cdk.CfnOutput(this, "DistributionId", {
 			value: this.distribution.distributionId,
 			description: "CloudFront Distribution ID",
+			exportName: `academia-${envName}-distribution-id`,
 		});
 
 		new cdk.CfnOutput(this, "DistributionDomainName", {
@@ -172,6 +181,7 @@ export class AcademiaFrontendStack extends cdk.Stack {
 		new cdk.CfnOutput(this, "FrontendBucketName", {
 			value: this.bucket.bucketName,
 			description: "Frontend S3 Bucket",
+			exportName: `academia-${envName}-frontend-bucket`,
 		});
 	}
 }

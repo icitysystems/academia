@@ -1,0 +1,36 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6": {
+      "displayName": "AcademiaBackend-Dev1/Custom::S3AutoDeleteObjectsCustomResourceProvider Code",
+      "source": {
+        "path": "asset.faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "771643347382-us-east-1-29148b34": {
+          "bucketName": "cdk-hnb659fds-assets-771643347382-us-east-1",
+          "objectKey": "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::771643347382:role/cdk-hnb659fds-file-publishing-role-771643347382-us-east-1"
+        }
+      }
+    },
+    "cb9b551d5c313adae1421c818325c08e6e1fbc79a2983a246f79645007ff9628": {
+      "displayName": "AcademiaBackend-Dev1 Template",
+      "source": {
+        "path": "AcademiaBackend-Dev1.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "771643347382-us-east-1-b897cb86": {
+          "bucketName": "cdk-hnb659fds-assets-771643347382-us-east-1",
+          "objectKey": "cb9b551d5c313adae1421c818325c08e6e1fbc79a2983a246f79645007ff9628.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::771643347382:role/cdk-hnb659fds-file-publishing-role-771643347382-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

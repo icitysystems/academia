@@ -33,6 +33,7 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { AcademicCalendar } from '../../components/calendar';
 
 // Icons
 import SchoolIcon from '@mui/icons-material/School';
@@ -832,17 +833,29 @@ const StudentDashboard: React.FC = () => {
 
         {/* Tab: Schedule */}
         <TabPanel value={tabValue} index={4}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Academic Calendar
-            </Typography>
-            <Box sx={{ textAlign: 'center', py: 6 }}>
-              <CalendarTodayIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-              <Typography color="text.secondary">
-                Calendar view coming soon. Check deadlines in the sidebar.
-              </Typography>
-            </Box>
-          </Paper>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Academic Calendar
+          </Typography>
+          <AcademicCalendar
+            events={[
+              // Convert upcoming deadlines to calendar events
+              ...(deadlines?.map((d: any) => ({
+                id: d.id,
+                title: d.title,
+                date: d.dueDate,
+                type: d.type === 'quiz' ? 'QUIZ' : 'ASSIGNMENT' as const,
+                courseName: d.courseName,
+              })) || []),
+            ]}
+            onEventClick={(event) => {
+              // Navigate to the assignment or quiz
+              if (event.type === 'ASSIGNMENT') {
+                navigate(`/assignments/${event.id}`);
+              } else if (event.type === 'QUIZ') {
+                navigate(`/quizzes/${event.id}`);
+              }
+            }}
+          />
         </TabPanel>
       </Container>
     </Box>

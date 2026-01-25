@@ -8,10 +8,13 @@ import { UpdateTemplateInput } from "./dto/update-template.input";
 import { CreateRegionInput } from "./dto/create-region.input";
 import { UpdateRegionInput } from "./dto/update-region.input";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import { Roles } from "../common/decorators/roles.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 
 @Resolver(() => Template)
-@UseGuards(GqlAuthGuard)
+@UseGuards(GqlAuthGuard, RolesGuard)
+@Roles("FACULTY", "ADMIN")
 export class TemplatesResolver {
 	constructor(private templatesService: TemplatesService) {}
 

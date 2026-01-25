@@ -459,6 +459,202 @@ export class AlumniService {
 	}
 
 	// ============================
+	// Frontend Dashboard Methods
+	// ============================
+
+	/**
+	 * Get transcripts for frontend alumni portal
+	 */
+	async getMyTranscripts(userId: string) {
+		await this.verifyAlumniOrGuest(userId);
+
+		// Get transcript requests
+		const transcriptRequests = await this.prisma.transcriptRequest.findMany({
+			where: { requesterId: userId },
+			orderBy: { createdAt: "desc" },
+		});
+
+		return transcriptRequests.map((t) => ({
+			id: t.id,
+			title: `Academic Transcript - ${t.createdAt.toLocaleDateString()}`,
+			issuedAt: t.processedAt || t.createdAt,
+			status: t.status,
+			downloadUrl: t.documentUrl,
+		}));
+	}
+
+	/**
+	 * Get certificates for frontend alumni portal
+	 */
+	async getMyCertificates(userId: string) {
+		await this.verifyAlumniOrGuest(userId);
+
+		const certificates = await this.prisma.certificate.findMany({
+			where: { studentId: userId },
+			include: {
+				course: { select: { title: true } },
+			},
+			orderBy: { issueDate: "desc" },
+		});
+
+		return certificates.map((c) => ({
+			id: c.id,
+			title: `Certificate - ${c.course?.title || "Course Completion"}`,
+			courseName: c.course?.title,
+			issuedAt: c.issueDate,
+			credentialId: c.certificateNumber,
+			verificationUrl: c.verificationUrl,
+		}));
+	}
+
+	/**
+	 * Get alumni network for frontend alumni portal
+	 */
+	async getAlumniNetwork(userId: string, search?: string) {
+		await this.verifyAlumniOrGuest(userId);
+
+		const whereClause: any = {
+			role: { in: [UserRole.ALUMNI, UserRole.STUDENT] },
+			isActive: true,
+			id: { not: userId }, // Exclude current user
+		};
+
+		if (search) {
+			whereClause.OR = [
+				{ name: { contains: search, mode: "insensitive" } },
+				{ email: { contains: search, mode: "insensitive" } },
+			];
+		}
+
+		const alumni = await this.prisma.user.findMany({
+			where: whereClause,
+			select: {
+				id: true,
+				name: true,
+				email: true,
+				avatarUrl: true,
+				preferences: true,
+			},
+			take: 50,
+		});
+
+		return alumni.map((a) => {
+			const prefs = a.preferences ? JSON.parse(a.preferences as string) : {};
+			return {
+				id: a.id,
+				name: a.name,
+				graduationYear: prefs.graduationYear,
+				company: prefs.company,
+				position: prefs.jobTitle,
+				location: prefs.location,
+				linkedInUrl: prefs.linkedIn,
+				avatarUrl: a.avatarUrl,
+			};
+		});
+	}
+
+	/**
+	 * Get job postings for alumni portal
+	 */
+	async getJobPostings() {
+		// Simulated job postings - in production this would come from a job postings table
+		return [
+			{
+				id: "job-1",
+				title: "Senior Software Engineer",
+				company: "Tech Corp",
+				location: "Remote",
+				type: "FULL_TIME",
+				salary: "$120,000 - $150,000",
+				postedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+				applyUrl: "https://techcorp.com/careers/senior-swe",
+			},
+			{
+				id: "job-2",
+				title: "Data Scientist",
+				company: "Analytics Inc",
+				location: "New York, NY",
+				type: "FULL_TIME",
+				salary: "$100,000 - $130,000",
+				postedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+				applyUrl: "https://analyticsinc.com/jobs/data-scientist",
+			},
+			{
+				id: "job-3",
+				title: "Product Manager",
+				company: "StartupXYZ",
+				location: "San Francisco, CA",
+				type: "FULL_TIME",
+				salary: "$130,000 - $160,000",
+				postedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+				applyUrl: "https://startupxyz.com/pm-role",
+			},
+		];
+	}
+
+	/**
+	 * Get alumni announcements
+	 */
+	async getAlumniAnnouncements(userId: string) {
+		await this.verifyAlumniOrGuest(userId);
+
+		// Return announcements targeted to alumni
+		// In production, this would come from an announcements table
+		return [
+			{
+				id: "ann-1",
+				title: "Annual Alumni Reunion 2025",
+				message:
+					"Join us for our annual reunion on June 15th. Registration opens soon!",
+				createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+			},
+			{
+				id: "ann-2",
+				title: "New Career Services Portal",
+				message:
+					"We've launched a new career services portal with exclusive job listings for alumni.",
+				createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+			},
+		];
+	}
+
+	/**
+	 * Get alumni perks
+	 */
+	async getAlumniPerks(userId: string) {
+		await this.verifyAlumniOrGuest(userId);
+
+		// Return perks for alumni
+		// In production, this would come from a perks/discounts table
+		return [
+			{
+				id: "perk-1",
+				title: "20% off continuing education",
+				description: "Alumni receive 20% off all continuing education courses",
+				discount: "20%",
+				validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+				code: "ALUMNI20",
+			},
+			{
+				id: "perk-2",
+				title: "Free career coaching session",
+				description: "One free 30-minute career coaching session per year",
+				discount: "100%",
+				validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+				code: "FREECOACH",
+			},
+			{
+				id: "perk-3",
+				title: "Library access",
+				description: "Continued access to digital library resources",
+				discount: "Free",
+				validUntil: null,
+				code: null,
+			},
+		];
+	}
+
+	// ============================
 	// Guest Access
 	// ============================
 

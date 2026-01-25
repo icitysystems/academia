@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@apollo/client';
 import {
   Container,
   Typography,
@@ -11,6 +12,8 @@ import {
   CardActions,
   Chip,
   LinearProgress,
+  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -21,6 +24,7 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import DescriptionIcon from '@mui/icons-material/Description';
+import { GET_LEARNING_RESOURCE_STATS, GET_RECENT_ACTIVITY } from '../../graphql/queries';
 
 const modules = [
   {
@@ -89,14 +93,36 @@ const modules = [
   },
 ];
 
-const recentActivity = [
-  { type: 'Lesson Plan', title: 'Introduction to Algebra', date: '2 hours ago' },
-  { type: 'Quiz', title: 'Chapter 5 Assessment', date: '5 hours ago' },
-  { type: 'Exam Paper', title: 'Mid-term Mathematics', date: '1 day ago' },
-  { type: 'Syllabus', title: 'Physics Form 4', date: '2 days ago' },
-];
+// Helper to format relative time
+const formatRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+};
 
 const LearningResourcesDashboard: React.FC = () => {
+  // Fetch real stats from the backend
+  const { data: statsData, loading: statsLoading } = useQuery(GET_LEARNING_RESOURCE_STATS);
+  const { data: activityData, loading: activityLoading } = useQuery(GET_RECENT_ACTIVITY, {
+    variables: { limit: 5 },
+  });
+
+  const stats = statsData?.learningResourceStats || {
+    lessonPlanCount: 0,
+    questionCount: 0,
+    activeQuizCount: 0,
+    examPaperCount: 0,
+  };
+
+  const recentActivity = activityData?.recentActivity || [];
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       {/* Header */}
@@ -113,25 +139,41 @@ const LearningResourcesDashboard: React.FC = () => {
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
-            <Typography variant="h3">24</Typography>
+            {statsLoading ? (
+              <Skeleton variant="text" width={60} height={60} sx={{ mx: 'auto' }} />
+            ) : (
+              <Typography variant="h3">{stats.lessonPlanCount}</Typography>
+            )}
             <Typography>Lesson Plans</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'secondary.light', color: 'white' }}>
-            <Typography variant="h3">156</Typography>
+            {statsLoading ? (
+              <Skeleton variant="text" width={60} height={60} sx={{ mx: 'auto' }} />
+            ) : (
+              <Typography variant="h3">{stats.questionCount}</Typography>
+            )}
             <Typography>Questions in Bank</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
-            <Typography variant="h3">8</Typography>
+            {statsLoading ? (
+              <Skeleton variant="text" width={60} height={60} sx={{ mx: 'auto' }} />
+            ) : (
+              <Typography variant="h3">{stats.activeQuizCount}</Typography>
+            )}
             <Typography>Active Quizzes</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'info.light', color: 'white' }}>
-            <Typography variant="h3">12</Typography>
+            {statsLoading ? (
+              <Skeleton variant="text" width={60} height={60} sx={{ mx: 'auto' }} />
+            ) : (
+              <Typography variant="h3">{stats.examPaperCount}</Typography>
+            )}
             <Typography>Exam Papers</Typography>
           </Paper>
         </Grid>
@@ -184,28 +226,38 @@ const LearningResourcesDashboard: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Recent Activity
             </Typography>
-            {recentActivity.map((item, index) => (
-              <Box 
-                key={index} 
-                sx={{ 
-                  py: 2, 
-                  borderBottom: index < recentActivity.length - 1 ? '1px solid #eee' : 'none',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <Box>
-                  <Chip label={item.type} size="small" sx={{ mr: 1 }} />
-                  <Typography component="span" fontWeight="medium">
-                    {item.title}
+            {activityLoading ? (
+              <Box display="flex" justifyContent="center" py={4}>
+                <CircularProgress />
+              </Box>
+            ) : recentActivity.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 2 }}>
+                No recent activity. Start by creating a lesson plan or quiz!
+              </Typography>
+            ) : (
+              recentActivity.map((item: any, index: number) => (
+                <Box 
+                  key={item.id || index} 
+                  sx={{ 
+                    py: 2, 
+                    borderBottom: index < recentActivity.length - 1 ? '1px solid #eee' : 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Box>
+                    <Chip label={item.entityType || item.type} size="small" sx={{ mr: 1 }} />
+                    <Typography component="span" fontWeight="medium">
+                      {item.title}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatRelativeTime(item.createdAt)}
                   </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {item.date}
-                </Typography>
-              </Box>
-            ))}
+              ))
+            )}
           </Paper>
         </Grid>
         <Grid item xs={12} md={4}>

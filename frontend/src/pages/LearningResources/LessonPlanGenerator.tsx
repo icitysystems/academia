@@ -26,8 +26,10 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Snackbar,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { useMutation, useQuery } from '@apollo/client';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -35,11 +37,37 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
+import { GENERATE_LESSON_PLAN, SAVE_LESSON_PLAN, EXPORT_LESSON_PLAN, GET_LESSON_PLANS } from '../../graphql/operations';
 
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+}
+
+interface Objective {
+  type: string;
+  text: string;
+}
+
+interface Phase {
+  name: string;
+  duration: string;
+  activities: string[];
+}
+
+interface GeneratedPlan {
+  id?: string;
+  topic: string;
+  subject: string;
+  gradeLevel: string;
+  duration: number;
+  objectives: Objective[];
+  competencies: string[];
+  phases: Phase[];
+  resources: string[];
+  differentiation: string[];
+  assessment?: string;
 }
 
 function TabPanel(props: TabPanelProps) {
@@ -52,9 +80,12 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const LessonPlanGenerator: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [generated, setGenerated] = useState(false);
   const [tabValue, setTabValue] = useState(0);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
   const [formData, setFormData] = useState({
     subject: '',
     topic: '',
@@ -63,85 +94,79 @@ const LessonPlanGenerator: React.FC = () => {
     classSize: '30',
     teachingMethod: '',
   });
+  const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
+
+  // GraphQL mutations
+  const [generateLessonPlan, { loading: generating }] = useMutation(GENERATE_LESSON_PLAN, {
+    onCompleted: (data) => {
+      setGeneratedPlan(data.generateLessonPlan);
+      setSnackbar({ open: true, message: 'Lesson plan generated successfully!', severity: 'success' });
+    },
+    onError: (error) => {
+      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+    },
+  });
+
+  const [saveLessonPlan, { loading: saving }] = useMutation(SAVE_LESSON_PLAN, {
+    onCompleted: () => {
+      setSnackbar({ open: true, message: 'Lesson plan saved!', severity: 'success' });
+    },
+    onError: (error) => {
+      setSnackbar({ open: true, message: `Error saving: ${error.message}`, severity: 'error' });
+    },
+  });
+
+  const [exportLessonPlan, { loading: exporting }] = useMutation(EXPORT_LESSON_PLAN, {
+    onCompleted: (data) => {
+      // Download the file
+      window.open(data.exportLessonPlan.url, '_blank');
+      setSnackbar({ open: true, message: 'Lesson plan exported!', severity: 'success' });
+    },
+    onError: (error) => {
+      setSnackbar({ open: true, message: `Error exporting: ${error.message}`, severity: 'error' });
+    },
+  });
 
   const handleGenerate = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setGenerated(true);
-    }, 2000);
+    generateLessonPlan({
+      variables: {
+        input: {
+          subject: formData.subject,
+          topic: formData.topic,
+          gradeLevel: formData.gradeLevel,
+          duration: parseInt(formData.duration),
+          classSize: parseInt(formData.classSize),
+          teachingMethod: formData.teachingMethod,
+        },
+      },
+    });
   };
 
-  const generatedPlan = {
-    objectives: [
-      { type: 'Knowledge', text: 'Define and explain the concept of quadratic equations' },
-      { type: 'Skills', text: 'Solve quadratic equations using factorization and the quadratic formula' },
-      { type: 'Attitudes', text: 'Appreciate the application of quadratic equations in real-world problems' },
-    ],
-    competencies: [
-      'Mathematical reasoning and problem-solving',
-      'Analytical thinking and logical deduction',
-      'Application of mathematical concepts',
-    ],
-    phases: [
-      {
-        name: 'Introduction',
-        duration: '5 min',
-        activities: [
-          'Greet students and take attendance',
-          'Review previous lesson on linear equations',
-          'Present a real-world problem involving quadratic relationships',
-        ],
-      },
-      {
-        name: 'Development',
-        duration: '25 min',
-        activities: [
-          'Introduce the standard form of quadratic equations: ax² + bx + c = 0',
-          'Demonstrate factorization method with examples',
-          'Introduce the quadratic formula and when to use it',
-          'Worked examples on the board with student participation',
-        ],
-      },
-      {
-        name: 'Practice',
-        duration: '10 min',
-        activities: [
-          'Individual practice: Solve 3 quadratic equations',
-          'Pair work: Compare solutions and methods',
-          'Teacher circulates to provide guidance',
-        ],
-      },
-      {
-        name: 'Assessment',
-        duration: '3 min',
-        activities: [
-          'Exit ticket: Solve one quadratic equation',
-          'Quick verbal check for understanding',
-        ],
-      },
-      {
-        name: 'Closure',
-        duration: '2 min',
-        activities: [
-          'Summarize key points',
-          'Assign homework: Exercises 4.1-4.5',
-          'Preview next lesson on graphing quadratics',
-        ],
-      },
-    ],
-    resources: [
-      'Textbook Chapter 4',
-      'Whiteboard and markers',
-      'Calculator (optional)',
-      'Worksheet with practice problems',
-    ],
-    differentiation: [
-      'Extended problems for advanced learners',
-      'Visual aids and step-by-step guides for struggling students',
-      'Peer tutoring opportunities',
-    ],
+  const handleSave = () => {
+    if (generatedPlan) {
+      saveLessonPlan({
+        variables: {
+          input: {
+            ...generatedPlan,
+            status: 'SAVED',
+          },
+        },
+      });
+    }
   };
+
+  const handleExport = (format: string = 'pdf') => {
+    if (generatedPlan?.id) {
+      exportLessonPlan({
+        variables: {
+          id: generatedPlan.id,
+          format,
+        },
+      });
+    }
+  };
+
+  const loading = generating;
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -253,7 +278,7 @@ const LessonPlanGenerator: React.FC = () => {
 
         {/* Generated Plan */}
         <Grid item xs={12} md={8}>
-          {!generated ? (
+          {!generatedPlan ? (
             <Paper sx={{ p: 4, textAlign: 'center', minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Box>
                 <AutoAwesomeIcon sx={{ fontSize: 64, color: 'grey.400', mb: 2 }} />
@@ -266,12 +291,27 @@ const LessonPlanGenerator: React.FC = () => {
             <Paper sx={{ p: 3 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h5" fontWeight="bold">
-                  {formData.topic || 'Lesson Plan'}
+                  {generatedPlan.topic || formData.topic || 'Lesson Plan'}
                 </Typography>
                 <Box display="flex" gap={1}>
                   <Button startIcon={<EditIcon />} size="small">Edit</Button>
-                  <Button startIcon={<SaveIcon />} size="small">Save</Button>
-                  <Button variant="contained" startIcon={<DownloadIcon />} size="small">Export</Button>
+                  <Button 
+                    startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />} 
+                    size="small"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    Save
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    startIcon={exporting ? <CircularProgress size={16} /> : <DownloadIcon />} 
+                    size="small"
+                    onClick={() => handleExport('pdf')}
+                    disabled={exporting || !generatedPlan.id}
+                  >
+                    Export
+                  </Button>
                 </Box>
               </Box>
 
@@ -443,6 +483,17 @@ const LessonPlanGenerator: React.FC = () => {
           )}
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

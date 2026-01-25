@@ -1,14 +1,24 @@
 import { ObjectType, Field, ID, registerEnumType } from "@nestjs/graphql";
 
-// Define UserRole enum for GraphQL
+/**
+ * User Role enum as per Specification Section 2A
+ * Must match roles used in Prisma schema and frontend
+ */
 export enum UserRoleEnum {
-	TEACHER = "TEACHER",
+	STUDENT = "STUDENT",
+	FACULTY = "FACULTY",
+	TEACHER = "TEACHER", // Alias for FACULTY (used in lesson tracking)
 	ADMIN = "ADMIN",
+	SUPPORT_STAFF = "SUPPORT_STAFF",
+	PARENT = "PARENT",
+	ALUMNI = "ALUMNI",
+	GUEST = "GUEST",
 }
 
 registerEnumType(UserRoleEnum, {
 	name: "UserRole",
-	description: "User roles in the system",
+	description:
+		"User roles in the system - STUDENT, FACULTY, TEACHER, ADMIN, SUPPORT_STAFF, PARENT, ALUMNI, GUEST",
 });
 
 @ObjectType()

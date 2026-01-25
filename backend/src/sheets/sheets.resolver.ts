@@ -7,10 +7,13 @@ import { SheetStatusCount } from "./models/sheet-status-count.model";
 import { UploadSheetInput } from "./dto/upload-sheet.input";
 import { BatchUploadInput } from "./dto/batch-upload.input";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import { Roles } from "../common/decorators/roles.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 
 @Resolver(() => AnswerSheet)
-@UseGuards(GqlAuthGuard)
+@UseGuards(GqlAuthGuard, RolesGuard)
+@Roles("FACULTY", "ADMIN")
 export class SheetsResolver {
 	constructor(private sheetsService: SheetsService) {}
 

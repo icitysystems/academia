@@ -4,11 +4,13 @@ import {
 	NotFoundException,
 	BadRequestException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma.service";
 import {
 	TensorFlowInferenceService,
 	GradingPrediction,
 } from "./tensorflow-inference.service";
+import { PythonMLClientService } from "./python-ml-client.service";
 
 export type Correctness = "CORRECT" | "PARTIAL" | "INCORRECT" | "SKIPPED";
 
@@ -33,14 +35,23 @@ export class MLService {
 	private readonly logger = new Logger(MLService.name);
 	private confidenceThreshold = 0.7; // Below this, flag for review
 	private useTensorFlow = true; // Toggle for TensorFlow vs rule-based
+	private usePythonService = false; // Toggle for Python ML service
 
 	constructor(
 		private prisma: PrismaService,
 		private tfInference: TensorFlowInferenceService,
-	) {}
+		private pythonClient: PythonMLClientService,
+		private configService: ConfigService,
+	) {
+		this.usePythonService =
+			this.configService.get<boolean>("ml.usePythonService") || false;
+		this.confidenceThreshold =
+			this.configService.get<number>("ml.confidenceThreshold") || 0.7;
+	}
 
 	/**
 	 * Grade a single sheet using the active model
+	 * Supports TensorFlow.js, Python ML service, or rule-based inference
 	 */
 	async gradeSheet(
 		sheetId: string,
@@ -74,10 +85,54 @@ export class MLService {
 		let totalScore = 0;
 		let maxScore = 0;
 
-		// Use TensorFlow inference when enabled
+		// Try Python ML service first if enabled and available
+		if (this.usePythonService && this.pythonClient.isServiceAvailable()) {
+			this.logger.log(
+				`Grading sheet ${sheetId} using Python ML service model ${modelId}`,
+			);
+
+			try {
+				for (const region of sheet.template.regions) {
+					const regionOcr = ocrData[region.id] || {};
+					const regionMetadata = region.metadata
+						? JSON.parse(region.metadata)
+						: {};
+					const expectedAnswer = regionMetadata.expectedAnswer || "";
+
+					const pythonResult = await this.pythonClient.predict({
+						model_id: modelId,
+						region_id: region.id,
+						text: regionOcr.text || "",
+						ocr_data: regionOcr,
+						question_type: region.questionType,
+						expected_answer: expectedAnswer,
+						max_points: region.points,
+					});
+
+					predictions.push({
+						regionId: pythonResult.region_id,
+						predictedCorrectness: pythonResult.predicted_correctness,
+						confidence: pythonResult.confidence,
+						assignedScore: pythonResult.assigned_score,
+						explanation: pythonResult.explanation,
+						needsReview: pythonResult.needs_review,
+					});
+					totalScore += pythonResult.assigned_score;
+					maxScore += region.points;
+				}
+
+				return { sheetId, totalScore, maxScore, predictions };
+			} catch (error) {
+				this.logger.warn(
+					`Python ML service failed, falling back to TensorFlow.js: ${error.message}`,
+				);
+			}
+		}
+
+		// Use TensorFlow.js inference when enabled
 		if (this.useTensorFlow) {
 			this.logger.log(
-				`Grading sheet ${sheetId} using TensorFlow model ${modelId}`,
+				`Grading sheet ${sheetId} using TensorFlow.js model ${modelId}`,
 			);
 
 			for (const region of sheet.template.regions) {
@@ -611,6 +666,404 @@ export class MLService {
 			correctness,
 			confidence,
 			explanation,
+		};
+	}
+
+	// ============================
+	// ACTIVE LEARNING (ML Enhancement)
+	// ============================
+
+	/**
+	 * Get samples prioritized for active learning
+	 * Prioritizes samples where the model is least confident
+	 */
+	async getActiveLearningPrioritizedSamples(modelId: string, limit = 20) {
+		const model = await this.prisma.mLModel.findUnique({
+			where: { id: modelId },
+		});
+
+		if (!model) {
+			throw new NotFoundException("Model not found");
+		}
+
+		// Get predictions with low confidence that haven't been manually reviewed
+		const lowConfidencePredictions = await this.prisma.gradingResult.findMany({
+			where: {
+				confidence: { lt: this.confidenceThreshold },
+				needsReview: true,
+			},
+			orderBy: { confidence: "asc" },
+			take: limit,
+			include: {
+				region: true,
+				sheet: { select: { id: true, studentName: true } },
+				job: true,
+			},
+		});
+
+		// Calculate diversity score to avoid redundant samples
+		const prioritizedSamples = this.diversifySamples(lowConfidencePredictions);
+
+		return {
+			modelId,
+			totalLowConfidence: lowConfidencePredictions.length,
+			samples: prioritizedSamples.map((p) => ({
+				gradingResultId: p.id,
+				regionId: p.regionId,
+				regionLabel: p.region.label,
+				questionType: p.region.questionType,
+				sheetId: p.sheet?.id,
+				studentName: p.sheet?.studentName,
+				confidence: p.confidence,
+				currentPrediction: p.predictedCorrectness,
+				currentScore: p.assignedScore,
+				explanation: p.explanation,
+				priorityScore: 1 - p.confidence, // Higher priority for lower confidence
+			})),
+			learningValue: this.estimateLearningValue(prioritizedSamples),
+		};
+	}
+
+	/**
+	 * Diversify samples to maximize learning value
+	 */
+	private diversifySamples(samples: any[]): any[] {
+		// Group by question type
+		const byType = samples.reduce(
+			(acc, s) => {
+				const type = s.region.questionType;
+				if (!acc[type]) acc[type] = [];
+				acc[type].push(s);
+				return acc;
+			},
+			{} as Record<string, any[]>,
+		);
+
+		// Take samples from each type proportionally
+		const diversified: any[] = [];
+		const types = Object.keys(byType);
+		const perType = Math.ceil(samples.length / types.length);
+
+		for (const type of types) {
+			diversified.push(...byType[type].slice(0, perType));
+		}
+
+		return diversified;
+	}
+
+	/**
+	 * Estimate learning value of a batch of samples
+	 */
+	private estimateLearningValue(samples: any[]): number {
+		if (samples.length === 0) return 0;
+
+		// Factors: confidence variance, question type diversity, sample count
+		const avgConfidence =
+			samples.reduce((sum, s) => sum + s.confidence, 0) / samples.length;
+		const confidenceVariance =
+			samples.reduce(
+				(sum, s) => sum + Math.pow(s.confidence - avgConfidence, 2),
+				0,
+			) / samples.length;
+
+		const uniqueTypes = new Set(samples.map((s) => s.region.questionType)).size;
+		const typeBonus = uniqueTypes / 5; // Assuming 5 question types max
+
+		return Math.min(
+			1,
+			(1 - avgConfidence) * 0.5 +
+				Math.sqrt(confidenceVariance) * 0.3 +
+				typeBonus * 0.2,
+		);
+	}
+
+	/**
+	 * Submit human feedback for active learning
+	 */
+	async submitActiveLearningFeedback(
+		gradingResultId: string,
+		feedback: {
+			correctedScore: number;
+			correctedCorrectness: Correctness;
+			reviewerNotes?: string;
+			reviewerId: string;
+		},
+	) {
+		const result = await this.prisma.gradingResult.findUnique({
+			where: { id: gradingResultId },
+			include: { region: true },
+		});
+
+		if (!result) {
+			throw new NotFoundException("Grading result not found");
+		}
+
+		// Update the grading result
+		await this.prisma.gradingResult.update({
+			where: { id: gradingResultId },
+			data: {
+				assignedScore: feedback.correctedScore,
+				predictedCorrectness: feedback.correctedCorrectness,
+				needsReview: false,
+				explanation:
+					result.explanation +
+					` [Reviewed: ${feedback.reviewerNotes || "Corrected by reviewer"}]`,
+			},
+		});
+
+		// Store feedback for model retraining
+		await this.prisma.auditLog.create({
+			data: {
+				userId: feedback.reviewerId,
+				action: "ACTIVE_LEARNING_FEEDBACK",
+				entityType: "GradingResult",
+				entityId: gradingResultId,
+				details: JSON.stringify({
+					originalScore: result.assignedScore,
+					correctedScore: feedback.correctedScore,
+					originalCorrectness: result.predictedCorrectness,
+					correctedCorrectness: feedback.correctedCorrectness,
+					regionType: result.region.questionType,
+				}),
+			},
+		});
+
+		return {
+			success: true,
+			gradingResultId,
+			updated: {
+				score: feedback.correctedScore,
+				correctness: feedback.correctedCorrectness,
+			},
+		};
+	}
+
+	// ============================
+	// MODEL DRIFT DETECTION
+	// ============================
+
+	/**
+	 * Detect model drift by comparing recent predictions to historical patterns
+	 */
+	async detectModelDrift(modelId: string) {
+		const model = await this.prisma.mLModel.findUnique({
+			where: { id: modelId },
+		});
+
+		if (!model) {
+			throw new NotFoundException("Model not found");
+		}
+
+		// Get recent predictions (last 7 days)
+		const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+		const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+		const [recentPredictions, historicalPredictions] = await Promise.all([
+			this.prisma.gradingResult.findMany({
+				where: { createdAt: { gte: weekAgo } },
+			}),
+			this.prisma.gradingResult.findMany({
+				where: { createdAt: { gte: monthAgo, lt: weekAgo } },
+			}),
+		]);
+
+		// Calculate metrics for drift detection
+		const recentMetrics = this.calculateDriftMetrics(recentPredictions);
+		const historicalMetrics = this.calculateDriftMetrics(historicalPredictions);
+
+		// Calculate drift scores
+		const confidenceDrift = Math.abs(
+			recentMetrics.avgConfidence - historicalMetrics.avgConfidence,
+		);
+		const accuracyDrift = Math.abs(
+			recentMetrics.correctRate - historicalMetrics.correctRate,
+		);
+		const distributionDrift = this.calculateDistributionDrift(
+			recentMetrics.scoreDistribution,
+			historicalMetrics.scoreDistribution,
+		);
+
+		const overallDriftScore =
+			(confidenceDrift + accuracyDrift + distributionDrift) / 3;
+		const driftDetected = overallDriftScore > 0.1;
+
+		return {
+			modelId,
+			driftDetected,
+			overallDriftScore,
+			metrics: {
+				confidence: {
+					recent: recentMetrics.avgConfidence,
+					historical: historicalMetrics.avgConfidence,
+					drift: confidenceDrift,
+				},
+				correctRate: {
+					recent: recentMetrics.correctRate,
+					historical: historicalMetrics.correctRate,
+					drift: accuracyDrift,
+				},
+				distribution: {
+					drift: distributionDrift,
+				},
+			},
+			sampleSizes: {
+				recent: recentPredictions.length,
+				historical: historicalPredictions.length,
+			},
+			recommendations: driftDetected
+				? [
+						"Consider retraining the model with recent data",
+						"Review recent grading patterns for anomalies",
+						"Check for changes in question types or formats",
+						"Verify OCR quality hasn't degraded",
+					]
+				: ["Model performance is stable", "Continue monitoring for drift"],
+			timestamp: new Date(),
+		};
+	}
+
+	/**
+	 * Calculate metrics for drift detection
+	 */
+	private calculateDriftMetrics(predictions: any[]) {
+		if (predictions.length === 0) {
+			return {
+				avgConfidence: 0,
+				correctRate: 0,
+				scoreDistribution: new Array(10).fill(0),
+			};
+		}
+
+		const avgConfidence =
+			predictions.reduce((sum, p) => sum + (p.confidence || 0), 0) /
+			predictions.length;
+
+		const correctCount = predictions.filter(
+			(p) => p.predictedCorrectness === "CORRECT",
+		).length;
+		const correctRate = correctCount / predictions.length;
+
+		// Score distribution (0-10%, 10-20%, etc.)
+		const scoreDistribution = new Array(10).fill(0);
+		for (const p of predictions) {
+			const bucket = Math.min(Math.floor((p.assignedScore / 10) * 10), 9);
+			scoreDistribution[bucket]++;
+		}
+		// Normalize
+		const total = predictions.length;
+		for (let i = 0; i < 10; i++) {
+			scoreDistribution[i] /= total;
+		}
+
+		return { avgConfidence, correctRate, scoreDistribution };
+	}
+
+	/**
+	 * Calculate distribution drift using Jensen-Shannon divergence approximation
+	 */
+	private calculateDistributionDrift(dist1: number[], dist2: number[]): number {
+		let divergence = 0;
+		for (let i = 0; i < dist1.length; i++) {
+			const p = dist1[i] || 0.0001;
+			const q = dist2[i] || 0.0001;
+			const m = (p + q) / 2;
+			divergence += 0.5 * (p * Math.log(p / m) + q * Math.log(q / m));
+		}
+		return Math.min(divergence, 1);
+	}
+
+	/**
+	 * Get model performance analytics
+	 */
+	async getModelPerformanceAnalytics(modelId: string) {
+		const model = await this.prisma.mLModel.findUnique({
+			where: { id: modelId },
+		});
+
+		if (!model) {
+			throw new NotFoundException("Model not found");
+		}
+
+		// Get all predictions with review status
+		const predictions = await this.prisma.gradingResult.findMany({
+			where: { job: { modelId } },
+			include: { region: true },
+		});
+
+		// Calculate performance by question type
+		const byQuestionType = predictions.reduce(
+			(acc, p) => {
+				const type = p.region.questionType;
+				if (!acc[type]) {
+					acc[type] = { total: 0, correct: 0, reviewed: 0, avgConfidence: 0 };
+				}
+				acc[type].total++;
+				if (p.predictedCorrectness === "CORRECT") acc[type].correct++;
+				if (!p.needsReview) acc[type].reviewed++;
+				acc[type].avgConfidence += p.confidence || 0;
+				return acc;
+			},
+			{} as Record<string, any>,
+		);
+
+		// Finalize averages
+		for (const type of Object.keys(byQuestionType)) {
+			byQuestionType[type].avgConfidence /= byQuestionType[type].total;
+			byQuestionType[type].accuracy =
+				byQuestionType[type].correct / byQuestionType[type].total;
+		}
+
+		// Get recent trend
+		const last7Days = new Array(7)
+			.fill(0)
+			.map((_, i) => {
+				const date = new Date();
+				date.setDate(date.getDate() - i);
+				return date.toISOString().split("T")[0];
+			})
+			.reverse();
+
+		const dailyMetrics = await Promise.all(
+			last7Days.map(async (date) => {
+				const start = new Date(date);
+				const end = new Date(date);
+				end.setDate(end.getDate() + 1);
+
+				const dayPredictions = predictions.filter(
+					(p) => p.createdAt >= start && p.createdAt < end,
+				);
+
+				return {
+					date,
+					predictions: dayPredictions.length,
+					avgConfidence:
+						dayPredictions.length > 0
+							? dayPredictions.reduce(
+									(sum, p) => sum + (p.confidence || 0),
+									0,
+								) / dayPredictions.length
+							: 0,
+				};
+			}),
+		);
+
+		return {
+			modelId,
+			modelName: `Model v${model.version}`,
+			totalPredictions: predictions.length,
+			overallAccuracy:
+				predictions.filter((p) => p.predictedCorrectness === "CORRECT").length /
+				predictions.length,
+			averageConfidence:
+				predictions.reduce((sum, p) => sum + (p.confidence || 0), 0) /
+				predictions.length,
+			needsReviewCount: predictions.filter((p) => p.needsReview).length,
+			byQuestionType: Object.entries(byQuestionType).map(([type, metrics]) => ({
+				type,
+				...metrics,
+			})),
+			dailyTrend: dailyMetrics,
+			lastUpdated: new Date(),
 		};
 	}
 }

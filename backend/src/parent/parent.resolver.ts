@@ -33,6 +33,46 @@ export class ParentResolver {
 		return this.parentService.getParentDashboard(user.id);
 	}
 
+	// ============================
+	// Frontend Dashboard Queries
+	// ============================
+
+	@Query(() => GraphQLJSON, {
+		description: "Get linked children with course and grade info",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async myChildren(@CurrentUser() user: any) {
+		return this.parentService.getMyChildren(user.id);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get payment history for parent",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async paymentHistory(@CurrentUser() user: any) {
+		return this.parentService.getPaymentHistoryForParent(user.id);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get upcoming payments for parent",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async upcomingPayments(@CurrentUser() user: any) {
+		return this.parentService.getUpcomingPayments(user.id);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get announcements for parents",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async parentAnnouncements(@CurrentUser() user: any) {
+		return this.parentService.getParentAnnouncements(user.id);
+	}
+
 	@Query(() => GraphQLJSON, {
 		description: "Get detailed progress for a linked student",
 	})
@@ -170,5 +210,68 @@ export class ParentResolver {
 			message,
 			studentId,
 		});
+	}
+
+	// ============================
+	// Billing & Payments (2A.5)
+	// "Access billing and payment information"
+	// ============================
+
+	@Query(() => GraphQLJSON, {
+		description: "Get billing info for linked students",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async parentBillingInfo(@CurrentUser() user: any) {
+		return this.parentService.getParentBillingInfo(user.id);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get payment history for a linked student",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async studentPaymentHistory(
+		@CurrentUser() user: any,
+		@Args("studentId") studentId: string,
+	) {
+		return this.parentService.getStudentPaymentHistory(user.id, studentId);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get tuition balance for linked students",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async studentTuitionBalance(
+		@CurrentUser() user: any,
+		@Args("studentId") studentId: string,
+	) {
+		return this.parentService.getStudentTuitionBalance(user.id, studentId);
+	}
+
+	@Query(() => GraphQLJSON, {
+		description: "Get payment options for tuition",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async paymentOptions(@CurrentUser() user: any) {
+		return this.parentService.getPaymentOptions(user.id);
+	}
+
+	// ============================
+	// Academic Calendar (3A.5)
+	// ============================
+
+	@Query(() => GraphQLJSON, {
+		description: "Get academic calendar for linked students",
+	})
+	@UseGuards(GqlAuthGuard, RolesGuard)
+	@Roles(UserRole.PARENT)
+	async studentAcademicCalendar(
+		@CurrentUser() user: any,
+		@Args("studentId", { nullable: true }) studentId?: string,
+	) {
+		return this.parentService.getStudentAcademicCalendar(user.id, studentId);
 	}
 }

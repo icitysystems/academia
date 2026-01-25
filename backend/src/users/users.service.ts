@@ -284,6 +284,139 @@ export class UsersService {
 		};
 	}
 
+	/**
+	 * Get student grades formatted for dashboard display
+	 * Returns grades grouped by course with GPA calculation
+	 */
+	async getMyGrades(studentId: string) {
+		const enrollments = await this.prisma.enrollment.findMany({
+			where: {
+				studentId,
+				status: { in: ["ACTIVE", "COMPLETED"] },
+			},
+			include: {
+				course: true,
+			},
+		});
+
+		const grades = await Promise.all(
+			enrollments.map(async (enrollment) => {
+				// Get submissions for this course
+				const submissions = await this.prisma.assignmentSubmission.findMany({
+					where: {
+						studentId,
+						score: { not: null },
+						assignment: {
+							lesson: {
+								module: {
+									courseId: enrollment.courseId,
+								},
+							},
+						},
+					},
+				});
+
+				// Calculate course grade
+				const scores = submissions
+					.map((s) => s.score)
+					.filter((s): s is number => s !== null);
+				const courseGrade =
+					scores.length > 0
+						? Math.round(
+								(scores.reduce((a, b) => a + b, 0) / scores.length) * 10,
+							) / 10
+						: null;
+
+				// Convert to GPA (4.0 scale)
+				const gpa = courseGrade
+					? courseGrade >= 90
+						? 4.0
+						: courseGrade >= 80
+							? 3.0
+							: courseGrade >= 70
+								? 2.0
+								: courseGrade >= 60
+									? 1.0
+									: 0.0
+					: null;
+
+				return {
+					id: enrollment.id,
+					courseId: enrollment.courseId,
+					courseName: enrollment.course.title,
+					grade: courseGrade
+						? courseGrade >= 90
+							? "A"
+							: courseGrade >= 80
+								? "B"
+								: courseGrade >= 70
+									? "C"
+									: courseGrade >= 60
+										? "D"
+										: "F"
+						: null,
+					gpa,
+					completedAt:
+						enrollment.status === "COMPLETED" ? enrollment.completedAt : null,
+				};
+			}),
+		);
+
+		return grades.filter((g) => g.grade !== null);
+	}
+
+	/**
+	 * Get student payments for dashboard display
+	 * Returns payment history including pending payments
+	 */
+	async getMyPayments(studentId: string) {
+		// Get subscription payments
+		const subscriptions = await this.prisma.subscription.findMany({
+			where: { userId: studentId },
+			include: { plan: true },
+			orderBy: { createdAt: "desc" },
+			take: 20,
+		});
+
+		// Get donations (if any by this user)
+		const donations = await this.prisma.donation.findMany({
+			where: { userId: studentId },
+			orderBy: { createdAt: "desc" },
+			take: 10,
+		});
+
+		// Format as unified payment records
+		const payments = [
+			...subscriptions.map((sub) => ({
+				id: sub.id,
+				amount: sub.priceAtSubscription || sub.plan?.priceMonthly || 0,
+				type: "SUBSCRIPTION" as const,
+				status: sub.status === "ACTIVE" ? "PAID" : sub.status,
+				dueDate: sub.currentPeriodEnd,
+				paidAt: sub.createdAt,
+				description: `${sub.plan?.name || "Subscription"} Plan`,
+			})),
+			...donations.map((don) => ({
+				id: don.id,
+				amount: don.amount,
+				type: "DONATION" as const,
+				status: don.status === "COMPLETED" ? "PAID" : don.status,
+				dueDate: null,
+				paidAt: don.completedAt || don.createdAt,
+				description: don.message || "Donation",
+			})),
+		];
+
+		// Sort by date
+		payments.sort((a, b) => {
+			const dateA = a.paidAt ? new Date(a.paidAt).getTime() : 0;
+			const dateB = b.paidAt ? new Date(b.paidAt).getTime() : 0;
+			return dateB - dateA;
+		});
+
+		return payments;
+	}
+
 	// ============================
 	// Faculty-Specific Actions (2A.2)
 	// ============================
@@ -1113,6 +1246,744 @@ export class UsersService {
 	}
 
 	// ============================
+	// ADMISSIONS WORKFLOW (Spec 3A.2)
+	// ============================
+
+	/**
+	 * Create admission application
+	 * As per Spec 3A.2: "Admissions management"
+	 */
+	async createAdmissionApplication(
+		applicantData: AdmissionApplicationInput,
+		adminId?: string,
+	) {
+		// Create user record first
+		const user = await this.prisma.user.create({
+			data: {
+				email: applicantData.email,
+				name: applicantData.name,
+				firstName: applicantData.firstName,
+				lastName: applicantData.lastName,
+				phone: applicantData.phone,
+				role: "APPLICANT", // Special role for applicants
+				isActive: false, // Not active until admitted
+			},
+		});
+
+		// Create application record using support ticket as workaround
+		const application = await this.prisma.supportTicket.create({
+			data: {
+				submitterId: user.id,
+				title: `Admission Application - ${applicantData.program}`,
+				description: JSON.stringify({
+					...applicantData,
+					applicationDate: new Date(),
+					status: "SUBMITTED",
+				}),
+				category: "OTHER",
+				priority: "MEDIUM",
+				status: "OPEN",
+			},
+		});
+
+		// Create audit log
+		await this.prisma.auditLog.create({
+			data: {
+				userId: adminId || user.id,
+				action: "CREATE_ADMISSION_APPLICATION",
+				entityType: "AdmissionApplication",
+				entityId: application.id,
+				details: JSON.stringify({ applicantEmail: applicantData.email }),
+			},
+		});
+
+		return {
+			applicationId: application.id,
+			applicantId: user.id,
+			status: "SUBMITTED",
+			submittedAt: application.createdAt,
+		};
+	}
+
+	/**
+	 * Review admission application
+	 */
+	async reviewAdmissionApplication(
+		applicationId: string,
+		reviewData: {
+			decision: "ACCEPTED" | "REJECTED" | "WAITLISTED" | "PENDING_DOCUMENTS";
+			notes?: string;
+			reviewerId: string;
+		},
+	) {
+		await this.verifyAdminRole(reviewData.reviewerId);
+
+		const application = await this.prisma.supportTicket.findUnique({
+			where: { id: applicationId },
+			include: { submitter: true },
+		});
+
+		if (!application) {
+			throw new NotFoundException("Application not found");
+		}
+
+		const applicationData = JSON.parse(application.description);
+		applicationData.reviewStatus = reviewData.decision;
+		applicationData.reviewNotes = reviewData.notes;
+		applicationData.reviewedAt = new Date();
+		applicationData.reviewedBy = reviewData.reviewerId;
+
+		// Update application
+		await this.prisma.supportTicket.update({
+			where: { id: applicationId },
+			data: {
+				description: JSON.stringify(applicationData),
+				status:
+					reviewData.decision === "ACCEPTED"
+						? "RESOLVED"
+						: reviewData.decision === "REJECTED"
+							? "CLOSED"
+							: "IN_PROGRESS",
+			},
+		});
+
+		// If accepted, update user role to STUDENT
+		if (reviewData.decision === "ACCEPTED") {
+			await this.prisma.user.update({
+				where: { id: application.submitterId },
+				data: {
+					role: "STUDENT",
+					isActive: true,
+				},
+			});
+		}
+
+		// Create audit log
+		await this.prisma.auditLog.create({
+			data: {
+				userId: reviewData.reviewerId,
+				action: "REVIEW_ADMISSION_APPLICATION",
+				entityType: "AdmissionApplication",
+				entityId: applicationId,
+				details: JSON.stringify({ decision: reviewData.decision }),
+			},
+		});
+
+		return {
+			applicationId,
+			applicantId: application.submitterId,
+			decision: reviewData.decision,
+			reviewedAt: new Date(),
+		};
+	}
+
+	/**
+	 * Get admission applications list
+	 */
+	async getAdmissionApplications(
+		adminId: string,
+		filters?: {
+			status?: string;
+			program?: string;
+			startDate?: Date;
+			endDate?: Date;
+		},
+	) {
+		await this.verifyAdminRole(adminId);
+
+		const applications = await this.prisma.supportTicket.findMany({
+			where: {
+				title: { startsWith: "Admission Application" },
+				...(filters?.startDate && {
+					createdAt: { gte: filters.startDate },
+				}),
+				...(filters?.endDate && {
+					createdAt: { lte: filters.endDate },
+				}),
+			},
+			include: { submitter: true },
+			orderBy: { createdAt: "desc" },
+		});
+
+		return applications
+			.map((app) => {
+				const data = JSON.parse(app.description);
+				return {
+					applicationId: app.id,
+					applicantId: app.submitterId,
+					applicantName: app.submitter.name,
+					applicantEmail: app.submitter.email,
+					program: data.program,
+					status: data.reviewStatus || "SUBMITTED",
+					submittedAt: app.createdAt,
+					reviewedAt: data.reviewedAt,
+				};
+			})
+			.filter((app) => {
+				if (filters?.status && app.status !== filters.status) return false;
+				if (filters?.program && app.program !== filters.program) return false;
+				return true;
+			});
+	}
+
+	/**
+	 * Bulk import students
+	 * As per Spec 3A.2: Bulk operations for admissions
+	 */
+	async bulkImportStudents(
+		adminId: string,
+		students: Array<{
+			email: string;
+			name: string;
+			firstName?: string;
+			lastName?: string;
+			program?: string;
+		}>,
+	) {
+		await this.verifyAdminRole(adminId);
+
+		const results = {
+			successful: [] as string[],
+			failed: [] as { email: string; error: string }[],
+		};
+
+		for (const studentData of students) {
+			try {
+				// Check if user already exists
+				const existing = await this.prisma.user.findUnique({
+					where: { email: studentData.email },
+				});
+
+				if (existing) {
+					results.failed.push({
+						email: studentData.email,
+						error: "Email already exists",
+					});
+					continue;
+				}
+
+				// Create student
+				await this.prisma.user.create({
+					data: {
+						email: studentData.email,
+						name: studentData.name,
+						firstName: studentData.firstName,
+						lastName: studentData.lastName,
+						role: "STUDENT",
+						isActive: true,
+					},
+				});
+
+				results.successful.push(studentData.email);
+			} catch (error: any) {
+				results.failed.push({
+					email: studentData.email,
+					error: error.message,
+				});
+			}
+		}
+
+		// Audit log
+		await this.prisma.auditLog.create({
+			data: {
+				userId: adminId,
+				action: "BULK_IMPORT_STUDENTS",
+				entityType: "User",
+				entityId: "bulk",
+				details: JSON.stringify({
+					successCount: results.successful.length,
+					failedCount: results.failed.length,
+				}),
+			},
+		});
+
+		return results;
+	}
+
+	// ============================
+	// GRADUATION MANAGEMENT (Spec 3A.2)
+	// ============================
+
+	/**
+	 * Get graduation candidates
+	 * As per Spec 3A.2: "Graduation processing"
+	 */
+	async getGraduationCandidates(
+		adminId: string,
+		filters?: {
+			program?: string;
+			graduationDate?: Date;
+			status?: string;
+		},
+	) {
+		await this.verifyAdminRole(adminId);
+
+		// Find students who have completed all requirements
+		const students = await this.prisma.user.findMany({
+			where: {
+				role: "STUDENT",
+				isActive: true,
+			},
+			include: {
+				enrollments: {
+					where: { status: "COMPLETED" },
+					include: { course: true },
+				},
+			},
+		});
+
+		// Calculate graduation eligibility
+		const candidates = [];
+		const requiredCourses = 8; // Example threshold (courses completed)
+
+		for (const student of students) {
+			const completedCourses = student.enrollments.length;
+
+			// Calculate GPA from quiz attempts and assignments
+			const avgGrade = await this.calculateStudentGPA(student.id);
+
+			if (completedCourses >= requiredCourses && avgGrade >= 2.0) {
+				candidates.push({
+					studentId: student.id,
+					studentName: student.name,
+					email: student.email,
+					completedCourses,
+					gpa: avgGrade,
+					enrollmentCount: student.enrollments.length,
+					status: "ELIGIBLE",
+					estimatedGraduationDate: this.getNextGraduationDate(),
+				});
+			}
+		}
+
+		return {
+			totalCandidates: candidates.length,
+			candidates,
+		};
+	}
+
+	/**
+	 * Process graduation for a student
+	 */
+	async processGraduation(
+		adminId: string,
+		studentId: string,
+		graduationData: {
+			graduationDate: Date;
+			honors?: string;
+			program?: string;
+		},
+	) {
+		await this.verifyAdminRole(adminId);
+
+		const student = await this.prisma.user.findUnique({
+			where: { id: studentId },
+		});
+
+		if (!student || student.role !== "STUDENT") {
+			throw new NotFoundException("Student not found");
+		}
+
+		// Update student role to ALUMNI
+		await this.prisma.user.update({
+			where: { id: studentId },
+			data: { role: "ALUMNI" },
+		});
+
+		// Create graduation record using support ticket
+		const graduation = await this.prisma.supportTicket.create({
+			data: {
+				submitterId: studentId,
+				title: `Graduation Record - ${studentId}`,
+				description: JSON.stringify({
+					graduationDate: graduationData.graduationDate,
+					honors: graduationData.honors,
+					program: graduationData.program,
+					processedBy: adminId,
+					processedAt: new Date(),
+				}),
+				category: "OTHER",
+				status: "RESOLVED",
+				priority: "LOW",
+			},
+		});
+
+		// Audit log
+		await this.prisma.auditLog.create({
+			data: {
+				userId: adminId,
+				action: "PROCESS_GRADUATION",
+				entityType: "User",
+				entityId: studentId,
+				details: JSON.stringify(graduationData),
+			},
+		});
+
+		return {
+			studentId,
+			studentName: student.name,
+			newRole: "ALUMNI",
+			graduationDate: graduationData.graduationDate,
+			honors: graduationData.honors,
+			graduationRecordId: graduation.id,
+		};
+	}
+
+	/**
+	 * Bulk process graduations
+	 */
+	async bulkProcessGraduation(
+		adminId: string,
+		studentIds: string[],
+		graduationDate: Date,
+	) {
+		await this.verifyAdminRole(adminId);
+
+		const results = {
+			successful: [] as string[],
+			failed: [] as { studentId: string; error: string }[],
+		};
+
+		for (const studentId of studentIds) {
+			try {
+				await this.processGraduation(adminId, studentId, {
+					graduationDate,
+				});
+				results.successful.push(studentId);
+			} catch (error: any) {
+				results.failed.push({
+					studentId,
+					error: error.message,
+				});
+			}
+		}
+
+		return results;
+	}
+
+	private async calculateStudentGPA(studentId: string): Promise<number> {
+		const [quizAttempts, assignments] = await Promise.all([
+			this.prisma.quizAttempt.findMany({
+				where: { studentId, submittedAt: { not: null } },
+			}),
+			this.prisma.assignmentSubmission.findMany({
+				where: { studentId, score: { not: null } },
+			}),
+		]);
+
+		const allGrades: number[] = [
+			...quizAttempts.map((q) => q.percentage || 0),
+			...assignments.map((a) => a.score || 0),
+		];
+
+		if (allGrades.length === 0) return 0;
+
+		const avgPercent = allGrades.reduce((a, b) => a + b, 0) / allGrades.length;
+		// Convert to 4.0 scale
+		if (avgPercent >= 90) return 4.0;
+		if (avgPercent >= 80) return 3.0;
+		if (avgPercent >= 70) return 2.0;
+		if (avgPercent >= 60) return 1.0;
+		return 0;
+	}
+
+	private getNextGraduationDate(): Date {
+		const now = new Date();
+		const month = now.getMonth();
+		// Graduation in May or December
+		if (month < 5) {
+			return new Date(now.getFullYear(), 4, 15); // May 15
+		} else if (month < 12) {
+			return new Date(now.getFullYear(), 11, 15); // December 15
+		}
+		return new Date(now.getFullYear() + 1, 4, 15); // Next May
+	}
+
+	// ============================
+	// Frontend Admin Dashboard Methods
+	// ============================
+
+	/**
+	 * Get system statistics for admin dashboard
+	 */
+	async getSystemStats(adminId: string) {
+		await this.verifyAdminRole(adminId);
+
+		const now = new Date();
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		const startOfDay = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+		);
+
+		const [
+			totalUsers,
+			totalStudents,
+			totalFaculty,
+			totalCourses,
+			activeCourses,
+			totalEnrollments,
+			newUsersThisMonth,
+			activeUsersToday,
+			payments,
+			monthlyPayments,
+			pendingPayments,
+		] = await Promise.all([
+			this.prisma.user.count(),
+			this.prisma.user.count({ where: { role: UserRole.STUDENT } }),
+			this.prisma.user.count({ where: { role: UserRole.FACULTY } }),
+			this.prisma.course.count(),
+			this.prisma.course.count({ where: { status: "PUBLISHED" } }),
+			this.prisma.enrollment.count(),
+			this.prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
+			this.prisma.user.count({ where: { lastLoginAt: { gte: startOfDay } } }),
+			this.prisma.payment.findMany({
+				where: { status: "COMPLETED" },
+				select: { amount: true },
+			}),
+			this.prisma.payment.findMany({
+				where: { status: "COMPLETED", createdAt: { gte: startOfMonth } },
+				select: { amount: true },
+			}),
+			this.prisma.payment.count({ where: { status: "PENDING" } }),
+		]);
+
+		const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) / 100;
+		const monthlyRevenue =
+			monthlyPayments.reduce((sum, p) => sum + p.amount, 0) / 100;
+
+		return {
+			totalUsers,
+			totalStudents,
+			totalFaculty,
+			totalCourses,
+			activeCourses,
+			totalEnrollments,
+			totalRevenue,
+			monthlyRevenue,
+			pendingPayments,
+			newUsersThisMonth,
+			activeUsersToday,
+		};
+	}
+
+	/**
+	 * Get recent users for admin dashboard
+	 */
+	async getRecentUsers(adminId: string) {
+		await this.verifyAdminRole(adminId);
+
+		const users = await this.prisma.user.findMany({
+			orderBy: { createdAt: "desc" },
+			take: 10,
+			select: {
+				id: true,
+				name: true,
+				email: true,
+				role: true,
+				isActive: true,
+				emailVerified: true,
+				createdAt: true,
+				lastLoginAt: true,
+			},
+		});
+
+		return users;
+	}
+
+	/**
+	 * Get recent enrollments for admin dashboard
+	 */
+	async getRecentEnrollments(adminId: string) {
+		await this.verifyAdminRole(adminId);
+
+		const enrollments = await this.prisma.enrollment.findMany({
+			orderBy: { enrolledAt: "desc" },
+			take: 10,
+			include: {
+				student: { select: { name: true } },
+				course: { select: { title: true } },
+			},
+		});
+
+		return enrollments.map((e) => ({
+			id: e.id,
+			studentName: e.student.name,
+			courseName: e.course.title,
+			enrolledAt: e.enrolledAt,
+			paymentStatus: e.paymentId ? "PAID" : "PENDING",
+		}));
+	}
+
+	/**
+	 * Get pending approvals for admin dashboard
+	 */
+	async getPendingApprovals(adminId: string) {
+		await this.verifyAdminRole(adminId);
+
+		// Get pending course approvals, transcript requests, etc.
+		const [pendingCourses, pendingTranscripts] = await Promise.all([
+			this.prisma.course.findMany({
+				where: { status: "PENDING_APPROVAL" },
+				select: {
+					id: true,
+					title: true,
+					createdAt: true,
+					instructor: { select: { name: true } },
+				},
+				take: 5,
+			}),
+			this.prisma.transcriptRequest.findMany({
+				where: { status: "PENDING" },
+				select: {
+					id: true,
+					createdAt: true,
+					requester: { select: { name: true } },
+				},
+				take: 5,
+			}),
+		]);
+
+		const approvals = [
+			...pendingCourses.map((c) => ({
+				id: c.id,
+				type: "COURSE_APPROVAL",
+				title: c.title,
+				requestedBy: c.instructor?.name,
+				requestedAt: c.createdAt,
+			})),
+			...pendingTranscripts.map((t) => ({
+				id: t.id,
+				type: "TRANSCRIPT_REQUEST",
+				title: "Transcript Request",
+				requestedBy: t.requester?.name,
+				requestedAt: t.createdAt,
+			})),
+		];
+
+		return approvals.sort(
+			(a, b) =>
+				new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(),
+		);
+	}
+
+	/**
+	 * Get system alerts for admin dashboard
+	 */
+	async getSystemAlerts(adminId: string) {
+		await this.verifyAdminRole(adminId);
+
+		const alerts = [];
+
+		// Check for various system conditions
+		const pendingPaymentsCount = await this.prisma.payment.count({
+			where: { status: "PENDING" },
+		});
+
+		if (pendingPaymentsCount > 10) {
+			alerts.push({
+				id: "alert-payments",
+				type: "WARNING",
+				message: `${pendingPaymentsCount} payments pending review`,
+				createdAt: new Date(),
+			});
+		}
+
+		const failedJobsCount = await this.prisma.gradingJob.count({
+			where: { status: "FAILED" },
+		});
+
+		if (failedJobsCount > 0) {
+			alerts.push({
+				id: "alert-grading",
+				type: "ERROR",
+				message: `${failedJobsCount} grading jobs failed`,
+				createdAt: new Date(),
+			});
+		}
+
+		// Check for inactive courses
+		const inactiveCourses = await this.prisma.course.count({
+			where: {
+				status: "PUBLISHED",
+				updatedAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+			},
+		});
+
+		if (inactiveCourses > 0) {
+			alerts.push({
+				id: "alert-inactive",
+				type: "INFO",
+				message: `${inactiveCourses} courses haven't been updated in 90 days`,
+				createdAt: new Date(),
+			});
+		}
+
+		return alerts;
+	}
+
+	/**
+	 * Get all users with pagination for admin
+	 */
+	async getAllUsers(
+		adminId: string,
+		options: { role?: string; search?: string; page?: number; limit?: number },
+	) {
+		await this.verifyAdminRole(adminId);
+
+		const page = options.page || 0;
+		const limit = options.limit || 20;
+
+		const where: any = {};
+
+		if (options.role) {
+			where.role = options.role;
+		}
+
+		if (options.search) {
+			where.OR = [
+				{ name: { contains: options.search, mode: "insensitive" } },
+				{ email: { contains: options.search, mode: "insensitive" } },
+			];
+		}
+
+		const [users, total] = await Promise.all([
+			this.prisma.user.findMany({
+				where,
+				skip: page * limit,
+				take: limit,
+				orderBy: { createdAt: "desc" },
+				select: {
+					id: true,
+					name: true,
+					email: true,
+					role: true,
+					isActive: true,
+					emailVerified: true,
+					createdAt: true,
+					lastLoginAt: true,
+					_count: {
+						select: {
+							enrollments: true,
+							instructedCourses: true,
+						},
+					},
+				},
+			}),
+			this.prisma.user.count({ where }),
+		]);
+
+		return {
+			users,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		};
+	}
+
+	// ============================
 	// Helper Methods
 	// ============================
 
@@ -1172,4 +2043,15 @@ interface TranscriptRequestInput {
 	copies?: number;
 	deliveryMethod?: string;
 	address?: string;
+}
+
+interface AdmissionApplicationInput {
+	email: string;
+	name: string;
+	firstName?: string;
+	lastName?: string;
+	phone?: string;
+	program: string;
+	previousEducation?: string;
+	documents?: string[];
 }

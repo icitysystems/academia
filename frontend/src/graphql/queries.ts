@@ -749,3 +749,293 @@ export const GET_SUBSCRIPTION_STATS = gql`
 		}
 	}
 `;
+
+// Analytics & Dashboard Stats
+export const GET_LEARNING_RESOURCE_STATS = gql`
+	query LearningResourceStats {
+		learningResourceStats
+	}
+`;
+
+export const GET_STUDENT_ANALYTICS = gql`
+	query StudentAnalytics($studentId: ID, $courseId: ID) {
+		studentAnalytics(studentId: $studentId, courseId: $courseId)
+	}
+`;
+
+export const GET_COURSE_ANALYTICS = gql`
+	query CourseAnalytics($courseId: ID!) {
+		courseAnalytics(courseId: $courseId)
+	}
+`;
+
+export const GET_PLATFORM_ANALYTICS = gql`
+	query PlatformAnalytics {
+		platformAnalytics
+	}
+`;
+
+export const GET_RECENT_ACTIVITY = gql`
+	query RecentActivity($limit: Int) {
+		recentActivity(limit: $limit)
+	}
+`;
+
+export const LOG_ACTIVITY = gql`
+	mutation LogActivity(
+		$type: String!
+		$entityType: String!
+		$entityId: String!
+		$title: String!
+		$description: String
+	) {
+		logActivity(
+			type: $type
+			entityType: $entityType
+			entityId: $entityId
+			title: $title
+			description: $description
+		)
+	}
+`;
+
+// Notifications
+export const GET_NOTIFICATIONS = gql`
+	query Notifications {
+		notifications {
+			id
+			type
+			title
+			message
+			isRead
+			link
+			metadata
+			createdAt
+		}
+	}
+`;
+
+export const GET_UNREAD_NOTIFICATION_COUNT = gql`
+	query UnreadNotificationCount {
+		unreadNotificationCount
+	}
+`;
+
+export const MARK_NOTIFICATION_AS_READ = gql`
+	mutation MarkNotificationAsRead($id: ID!) {
+		markNotificationAsRead(id: $id) {
+			id
+			isRead
+		}
+	}
+`;
+
+export const MARK_ALL_NOTIFICATIONS_AS_READ = gql`
+	mutation MarkAllNotificationsAsRead {
+		markAllNotificationsAsRead
+	}
+`;
+
+export const DELETE_NOTIFICATION = gql`
+	mutation DeleteNotification($id: ID!) {
+		deleteNotification(id: $id)
+	}
+`;
+
+// Live Sessions (WebRTC)
+export const GET_LIVE_SESSIONS = gql`
+	query LiveSessions($courseId: ID) {
+		liveSessions(courseId: $courseId) {
+			id
+			title
+			description
+			status
+			scheduledStart
+			scheduledEnd
+			actualStart
+			actualEnd
+			maxParticipants
+			courseId
+			hostId
+			host {
+				id
+				name
+			}
+			_count {
+				participants
+			}
+		}
+	}
+`;
+
+export const GET_LIVE_SESSION = gql`
+	query LiveSession($id: ID!) {
+		liveSession(id: $id) {
+			id
+			title
+			description
+			status
+			scheduledStart
+			scheduledEnd
+			actualStart
+			actualEnd
+			maxParticipants
+			courseId
+			course {
+				id
+				title
+			}
+			hostId
+			host {
+				id
+				name
+			}
+			participants {
+				id
+				userId
+				user {
+					id
+					name
+				}
+				role
+				joinedAt
+				leftAt
+			}
+		}
+	}
+`;
+
+export const CREATE_LIVE_SESSION = gql`
+	mutation CreateLiveSession($input: CreateLiveSessionInput!) {
+		createLiveSession(input: $input) {
+			id
+			title
+			status
+			scheduledStart
+			roomId
+		}
+	}
+`;
+
+export const JOIN_LIVE_SESSION = gql`
+	mutation JoinLiveSession($sessionId: ID!) {
+		joinLiveSession(sessionId: $sessionId) {
+			participantId
+			roomId
+			token
+			iceServers {
+				urls
+				username
+				credential
+			}
+		}
+	}
+`;
+
+export const LEAVE_LIVE_SESSION = gql`
+	mutation LeaveLiveSession($sessionId: ID!) {
+		leaveLiveSession(sessionId: $sessionId)
+	}
+`;
+
+export const START_LIVE_SESSION = gql`
+	mutation StartLiveSession($sessionId: ID!) {
+		startLiveSession(sessionId: $sessionId) {
+			id
+			status
+			actualStart
+		}
+	}
+`;
+
+export const END_LIVE_SESSION = gql`
+	mutation EndLiveSession($sessionId: ID!) {
+		endLiveSession(sessionId: $sessionId) {
+			id
+			status
+			actualEnd
+		}
+	}
+`;
+
+// ============================================
+// Homepage Queries
+// ============================================
+
+export const GET_HOMEPAGE_DATA = gql`
+	query GetHomepageData {
+		homepageData {
+			featuredCourses {
+				id
+				title
+				description
+				instructor
+				instructorAvatar
+				rating
+				students
+				duration
+				thumbnailUrl
+				category
+				price
+				level
+			}
+			testimonials {
+				id
+				name
+				role
+				content
+				avatarUrl
+				rating
+			}
+			stats {
+				totalStudents
+				totalCourses
+				totalInstructors
+				completionRate
+			}
+		}
+	}
+`;
+
+export const GET_FEATURED_COURSES = gql`
+	query GetFeaturedCourses($limit: Int) {
+		featuredCourses(limit: $limit) {
+			id
+			title
+			description
+			instructor
+			instructorAvatar
+			rating
+			students
+			duration
+			thumbnailUrl
+			category
+			price
+			level
+		}
+	}
+`;
+
+export const GET_TESTIMONIALS = gql`
+	query GetTestimonials($limit: Int) {
+		testimonials(limit: $limit) {
+			id
+			name
+			role
+			content
+			avatarUrl
+			rating
+		}
+	}
+`;
+
+export const GET_PLATFORM_STATS = gql`
+	query GetPlatformStats {
+		platformStats {
+			totalStudents
+			totalCourses
+			totalInstructors
+			completionRate
+		}
+	}
+`;

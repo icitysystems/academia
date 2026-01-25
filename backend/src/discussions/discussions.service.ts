@@ -378,7 +378,7 @@ export class DiscussionsService {
 	}
 
 	/**
-	 * Upvote a post
+	 * Upvote a post - prevents duplicate upvotes
 	 */
 	async upvotePost(postId: string, userId: string) {
 		const post = await this.prisma.discussionPost.findUnique({
@@ -389,11 +389,57 @@ export class DiscussionsService {
 			throw new NotFoundException("Post not found");
 		}
 
-		// TODO: Track individual upvotes to prevent duplicates
+		// Check if user already upvoted this post
+		const existingUpvote = await this.prisma.postUpvote.findUnique({
+			where: {
+				postId_userId: { postId, userId },
+			},
+		});
+
+		if (existingUpvote) {
+			// Remove upvote (toggle off)
+			await this.prisma.postUpvote.delete({
+				where: { id: existingUpvote.id },
+			});
+			return this.prisma.discussionPost.update({
+				where: { id: postId },
+				data: { upvotes: { decrement: 1 } },
+				include: {
+					author: {
+						select: { id: true, name: true, avatarUrl: true, role: true },
+					},
+					upvotedBy: { select: { userId: true } },
+				},
+			});
+		}
+
+		// Create new upvote
+		await this.prisma.postUpvote.create({
+			data: { postId, userId },
+		});
+
 		return this.prisma.discussionPost.update({
 			where: { id: postId },
 			data: { upvotes: { increment: 1 } },
+			include: {
+				author: {
+					select: { id: true, name: true, avatarUrl: true, role: true },
+				},
+				upvotedBy: { select: { userId: true } },
+			},
 		});
+	}
+
+	/**
+	 * Check if user has upvoted a post
+	 */
+	async hasUserUpvoted(postId: string, userId: string): Promise<boolean> {
+		const upvote = await this.prisma.postUpvote.findUnique({
+			where: {
+				postId_userId: { postId, userId },
+			},
+		});
+		return !!upvote;
 	}
 
 	/**

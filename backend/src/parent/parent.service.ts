@@ -8,6 +8,36 @@ import {
 import { PrismaService } from "../prisma.service";
 import { UserRole } from "../common/types";
 
+// Types - exported for use in resolver
+export interface Notification {
+	id: string;
+	type: string;
+	title: string;
+	message: string;
+	timestamp: Date;
+	studentId: string;
+}
+
+export interface NotificationPreferences {
+	gradeAlerts?: boolean;
+	attendanceAlerts?: boolean;
+	assignmentDue?: boolean;
+	courseCompletion?: boolean;
+	weeklyDigest?: boolean;
+	emailNotifications?: boolean;
+	smsNotifications?: boolean;
+	pushNotifications?: boolean;
+	quietHoursStart?: string;
+	quietHoursEnd?: string;
+}
+
+export interface SendMessageInput {
+	recipientId?: string;
+	subject: string;
+	message: string;
+	studentId?: string;
+}
+
 /**
  * Parent Portal Service
  * Implements parent/guardian features as per Specification Section 2A.5
@@ -675,34 +705,606 @@ export class ParentService {
 
 		return link;
 	}
-}
 
-// Types - exported for use in resolver
-export interface Notification {
-	id: string;
-	type: string;
-	title: string;
-	message: string;
-	timestamp: Date;
-	studentId: string;
-}
+	// ============================
+	// Billing & Payments Methods (2A.5)
+	// ============================
 
-export interface NotificationPreferences {
-	gradeAlerts?: boolean;
-	attendanceAlerts?: boolean;
-	assignmentDue?: boolean;
-	courseCompletion?: boolean;
-	weeklyDigest?: boolean;
-	emailNotifications?: boolean;
-	smsNotifications?: boolean;
-	pushNotifications?: boolean;
-	quietHoursStart?: string;
-	quietHoursEnd?: string;
-}
+	/**
+	 * Get billing info for linked students
+	 * As per Spec 2A.5: "Access billing and payment information"
+	 */
+	async getParentBillingInfo(parentId: string) {
+		await this.verifyParentRole(parentId);
 
-export interface SendMessageInput {
-	recipientId?: string;
-	subject: string;
-	message: string;
-	studentId?: string;
+		const links = await this.prisma.studentParent.findMany({
+			where: { parentId, canViewPayments: true },
+			include: {
+				student: {
+					select: {
+						id: true,
+						name: true,
+						email: true,
+					},
+				},
+			},
+		});
+
+		const billingInfo = await Promise.all(
+			links.map(async (link) => {
+				const payments = await this.prisma.payment.findMany({
+					where: { userId: link.studentId },
+					orderBy: { createdAt: "desc" },
+					take: 5,
+				});
+
+				const totalDue = await this.prisma.payment.aggregate({
+					_sum: { amount: true },
+					where: { userId: link.studentId, status: "PENDING" },
+				});
+
+				const totalPaid = await this.prisma.payment.aggregate({
+					_sum: { amount: true },
+					where: { userId: link.studentId, status: "COMPLETED" },
+				});
+
+				return {
+					studentId: link.studentId,
+					studentName: link.student.name,
+					totalDue: totalDue._sum.amount || 0,
+					totalPaid: totalPaid._sum.amount || 0,
+					recentPayments: payments.map((p) => ({
+						id: p.id,
+						amount: p.amount,
+						type: p.type,
+						status: p.status,
+						dueDate: p.dueDate,
+						paidAt: p.paidAt,
+					})),
+				};
+			}),
+		);
+
+		return {
+			linkedStudents: billingInfo,
+			lastUpdated: new Date(),
+		};
+	}
+
+	/**
+	 * Get payment history for a linked student
+	 */
+	async getStudentPaymentHistory(parentId: string, studentId: string) {
+		const link = await this.verifyStudentLink(parentId, studentId);
+
+		if (!link.canViewPayments) {
+			throw new ForbiddenException(
+				"Not authorized to view payment information",
+			);
+		}
+
+		const payments = await this.prisma.payment.findMany({
+			where: { userId: studentId },
+			orderBy: { createdAt: "desc" },
+		});
+
+		const summary = {
+			totalPaid: 0,
+			totalPending: 0,
+			totalOverdue: 0,
+		};
+
+		const now = new Date();
+		for (const payment of payments) {
+			if (payment.status === "COMPLETED") {
+				summary.totalPaid += payment.amount;
+			} else if (payment.status === "PENDING") {
+				if (payment.dueDate && payment.dueDate < now) {
+					summary.totalOverdue += payment.amount;
+				} else {
+					summary.totalPending += payment.amount;
+				}
+			}
+		}
+
+		return {
+			studentId,
+			payments: payments.map((p) => ({
+				id: p.id,
+				amount: p.amount,
+				currency: p.currency,
+				type: p.type,
+				status: p.status,
+				description: p.description,
+				dueDate: p.dueDate,
+				paidAt: p.paidAt,
+				receiptUrl: p.receiptUrl,
+				createdAt: p.createdAt,
+			})),
+			summary,
+		};
+	}
+
+	/**
+	 * Get tuition balance for a linked student
+	 */
+	async getStudentTuitionBalance(parentId: string, studentId: string) {
+		const link = await this.verifyStudentLink(parentId, studentId);
+
+		if (!link.canViewPayments) {
+			throw new ForbiddenException(
+				"Not authorized to view payment information",
+			);
+		}
+
+		// Get course enrollments with fees
+		const enrollments = await this.prisma.enrollment.findMany({
+			where: { studentId, status: "ACTIVE" },
+			include: {
+				course: {
+					select: { id: true, title: true, price: true, currency: true },
+				},
+			},
+		});
+
+		// Get pending tuition payments
+		const pendingPayments = await this.prisma.payment.findMany({
+			where: { userId: studentId, type: "TUITION", status: "PENDING" },
+		});
+
+		const totalTuition = enrollments.reduce(
+			(sum, e) => sum + (e.course.price || 0),
+			0,
+		);
+		const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+		const amountPaid = enrollments.reduce(
+			(sum, e) => sum + (e.amountPaid || 0),
+			0,
+		);
+
+		return {
+			studentId,
+			totalTuition,
+			amountPaid,
+			balanceDue: totalTuition - amountPaid,
+			pendingPayments: totalPending,
+			enrollments: enrollments.map((e) => ({
+				courseId: e.courseId,
+				courseTitle: e.course.title,
+				fee: e.course.price,
+				paid: e.amountPaid || 0,
+			})),
+			dueDate: pendingPayments[0]?.dueDate || null,
+		};
+	}
+
+	/**
+	 * Get available payment options
+	 */
+	async getPaymentOptions(parentId: string) {
+		await this.verifyParentRole(parentId);
+
+		return {
+			methods: [
+				{
+					id: "card",
+					name: "Credit/Debit Card",
+					description:
+						"Pay securely with Visa, Mastercard, or American Express",
+					isEnabled: true,
+				},
+				{
+					id: "bank_transfer",
+					name: "Bank Transfer",
+					description: "Direct bank transfer to institution account",
+					isEnabled: true,
+				},
+				{
+					id: "mobile_money",
+					name: "Mobile Money",
+					description: "Pay via MTN, Orange, or other mobile money services",
+					isEnabled: true,
+				},
+			],
+			installmentPlans: [
+				{
+					id: "full",
+					name: "Full Payment",
+					description: "Pay the full amount at once",
+					discount: 5,
+				},
+				{
+					id: "semester",
+					name: "Per Semester",
+					description: "Split payment across semesters",
+					discount: 0,
+				},
+				{
+					id: "monthly",
+					name: "Monthly Installments",
+					description: "Pay in 6 monthly installments",
+					surcharge: 2,
+				},
+			],
+		};
+	}
+
+	/**
+	 * Get academic calendar for linked students
+	 */
+	async getStudentAcademicCalendar(parentId: string, studentId?: string) {
+		await this.verifyParentRole(parentId);
+
+		const links = await this.prisma.studentParent.findMany({
+			where: {
+				parentId,
+				...(studentId ? { studentId } : {}),
+			},
+			select: { studentId: true },
+		});
+
+		const studentIds = links.map((l) => l.studentId);
+
+		if (studentIds.length === 0) {
+			return { events: [] };
+		}
+
+		// Get enrolled course IDs
+		const enrollments = await this.prisma.enrollment.findMany({
+			where: { studentId: { in: studentIds }, status: "ACTIVE" },
+			select: { courseId: true },
+		});
+		const courseIds = [...new Set(enrollments.map((e) => e.courseId))];
+
+		const now = new Date();
+		const endDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+		// Get upcoming assignments and quizzes
+		const [assignments, quizzes, courses] = await Promise.all([
+			this.prisma.assignment.findMany({
+				where: {
+					lesson: { module: { courseId: { in: courseIds } } },
+					dueDate: { gte: now, lte: endDate },
+					status: "PUBLISHED",
+				},
+				include: {
+					lesson: {
+						select: {
+							module: { select: { course: { select: { title: true } } } },
+						},
+					},
+				},
+				orderBy: { dueDate: "asc" },
+			}),
+
+			this.prisma.onlineQuiz.findMany({
+				where: {
+					lesson: { module: { courseId: { in: courseIds } } },
+					availableUntil: { gte: now, lte: endDate },
+					status: "PUBLISHED",
+				},
+				include: {
+					lesson: {
+						select: {
+							module: { select: { course: { select: { title: true } } } },
+						},
+					},
+				},
+				orderBy: { availableUntil: "asc" },
+			}),
+
+			this.prisma.course.findMany({
+				where: { id: { in: courseIds } },
+				select: { id: true, title: true, startDate: true, endDate: true },
+			}),
+		]);
+
+		const events = [];
+
+		for (const a of assignments) {
+			events.push({
+				id: `assignment-${a.id}`,
+				type: "ASSIGNMENT",
+				title: a.title,
+				courseName: a.lesson?.module?.course?.title,
+				date: a.dueDate,
+				description: `Assignment due for ${a.lesson?.module?.course?.title}`,
+			});
+		}
+
+		for (const q of quizzes) {
+			events.push({
+				id: `quiz-${q.id}`,
+				type: "QUIZ",
+				title: q.title,
+				courseName: q.lesson?.module?.course?.title,
+				date: q.availableUntil,
+				description: `Quiz deadline for ${q.lesson?.module?.course?.title}`,
+			});
+		}
+
+		for (const c of courses) {
+			if (c.endDate && c.endDate >= now && c.endDate <= endDate) {
+				events.push({
+					id: `course-end-${c.id}`,
+					type: "COURSE_END",
+					title: `Course Ends: ${c.title}`,
+					courseName: c.title,
+					date: c.endDate,
+				});
+			}
+		}
+
+		return {
+			events: events.sort((a, b) => a.date.getTime() - b.date.getTime()),
+			startDate: now,
+			endDate,
+		};
+	}
+
+	// ============================
+	// Frontend Dashboard Methods
+	// ============================
+
+	/**
+	 * Get children with enrolled courses and grades for frontend dashboard
+	 */
+	async getMyChildren(parentId: string) {
+		await this.verifyParentRole(parentId);
+
+		const links = await this.prisma.studentParent.findMany({
+			where: { parentId, isVerified: true },
+			include: {
+				student: {
+					include: {
+						enrollments: {
+							where: { status: { in: ["ACTIVE", "COMPLETED"] } },
+							include: {
+								course: {
+									include: {
+										instructor: { select: { name: true } },
+									},
+								},
+								lessonProgress: true,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		return Promise.all(
+			links.map(async (link) => {
+				const student = link.student;
+				const enrollments = student.enrollments;
+
+				// Calculate GPA from assignment submissions
+				const submissions = await this.prisma.assignmentSubmission.findMany({
+					where: { studentId: student.id, score: { not: null } },
+					select: { score: true, maxScore: true },
+				});
+
+				const overallGPA =
+					submissions.length > 0
+						? (
+								submissions.reduce(
+									(sum, s) => sum + ((s.score || 0) / (s.maxScore || 100)) * 4,
+									0,
+								) / submissions.length
+							).toFixed(2)
+						: null;
+
+				// Get attendance rate (from lesson completions)
+				const totalLessons = enrollments.reduce(
+					(sum, e) => sum + (e.lessonProgress?.length || 0),
+					0,
+				);
+				const completedLessons = enrollments.reduce(
+					(sum, e) =>
+						sum +
+						(e.lessonProgress?.filter((lp: any) => lp.completed).length || 0),
+					0,
+				);
+				const attendanceRate =
+					totalLessons > 0
+						? Math.round((completedLessons / totalLessons) * 100)
+						: null;
+
+				// Get recent grades
+				const recentGrades = await this.prisma.assignmentSubmission.findMany({
+					where: { studentId: student.id, score: { not: null } },
+					include: {
+						assignment: {
+							include: {
+								lesson: {
+									include: {
+										module: {
+											include: { course: { select: { title: true } } },
+										},
+									},
+								},
+							},
+						},
+					},
+					orderBy: { gradedAt: "desc" },
+					take: 5,
+				});
+
+				// Get upcoming deadlines
+				const now = new Date();
+				const upcomingDeadlines = await this.prisma.assignment.findMany({
+					where: {
+						lesson: {
+							module: {
+								course: {
+									enrollments: { some: { studentId: student.id } },
+								},
+							},
+						},
+						dueDate: { gte: now },
+						status: "PUBLISHED",
+					},
+					include: {
+						lesson: {
+							include: {
+								module: {
+									include: { course: { select: { title: true } } },
+								},
+							},
+						},
+					},
+					orderBy: { dueDate: "asc" },
+					take: 5,
+				});
+
+				return {
+					id: student.id,
+					name: student.name,
+					email: student.email,
+					enrolledCourses: enrollments.map((e) => ({
+						id: e.course.id,
+						title: e.course.title,
+						progress: e.progress || 0,
+						currentGrade: null, // Grade calculated from submissions
+						instructor: e.course.instructor?.name || "TBD",
+						status: e.status,
+					})),
+					recentGrades: recentGrades.map((g) => ({
+						id: g.id,
+						courseName: g.assignment.lesson?.module?.course?.title,
+						assignmentTitle: g.assignment.title,
+						score: g.score,
+						maxScore: g.maxScore || g.assignment.totalMarks,
+						gradedAt: g.gradedAt,
+					})),
+					upcomingDeadlines: upcomingDeadlines.map((d) => ({
+						id: d.id,
+						title: d.title,
+						courseName: d.lesson?.module?.course?.title,
+						dueDate: d.dueDate,
+						type: "ASSIGNMENT",
+					})),
+					attendanceRate,
+					overallGPA,
+				};
+			}),
+		);
+	}
+
+	/**
+	 * Get payment history for parent frontend
+	 */
+	async getPaymentHistoryForParent(parentId: string) {
+		await this.verifyParentRole(parentId);
+
+		const studentIds = await this.getLinkedStudentIds(parentId);
+
+		// Get all payments for linked students
+		const payments = await this.prisma.payment.findMany({
+			where: {
+				userId: { in: studentIds },
+			},
+			orderBy: { createdAt: "desc" },
+			take: 20,
+		});
+
+		return payments.map((p) => ({
+			id: p.id,
+			description: p.description || "Course Payment",
+			amount: p.amount,
+			status: p.status,
+			paidAt: p.status === "COMPLETED" ? p.updatedAt : null,
+			dueDate: p.createdAt,
+		}));
+	}
+
+	/**
+	 * Get upcoming payments for parent frontend
+	 */
+	async getUpcomingPayments(parentId: string) {
+		await this.verifyParentRole(parentId);
+
+		const studentIds = await this.getLinkedStudentIds(parentId);
+
+		// Get pending payments
+		const pendingPayments = await this.prisma.payment.findMany({
+			where: {
+				userId: { in: studentIds },
+				status: "PENDING",
+			},
+			orderBy: { createdAt: "asc" },
+		});
+
+		// Also check for upcoming subscription renewals
+		const subscriptions = await this.prisma.subscription.findMany({
+			where: {
+				userId: { in: studentIds },
+				status: "ACTIVE",
+			},
+			include: { plan: true },
+		});
+
+		const upcomingSubscriptions = subscriptions
+			.filter((s) => s.currentPeriodEnd)
+			.map((s) => ({
+				id: `sub-${s.id}`,
+				description: `${s.plan.name} Subscription Renewal`,
+				amount:
+					s.billingCycle === "YEARLY"
+						? s.plan.priceYearly
+						: s.plan.priceMonthly,
+				dueDate: s.currentPeriodEnd,
+			}));
+
+		return [
+			...pendingPayments.map((p) => ({
+				id: p.id,
+				description: p.description || "Payment Due",
+				amount: p.amount,
+				dueDate: p.createdAt,
+			})),
+			...upcomingSubscriptions,
+		];
+	}
+
+	/**
+	 * Get announcements for parents
+	 */
+	async getParentAnnouncements(parentId: string) {
+		await this.verifyParentRole(parentId);
+
+		const studentIds = await this.getLinkedStudentIds(parentId);
+
+		// Get course announcements for enrolled courses
+		const enrollments = await this.prisma.enrollment.findMany({
+			where: { studentId: { in: studentIds }, status: "ACTIVE" },
+			select: { courseId: true },
+		});
+		const courseIds = [...new Set(enrollments.map((e) => e.courseId))];
+
+		const announcements = await this.prisma.courseAnnouncement.findMany({
+			where: { courseId: { in: courseIds } },
+			orderBy: { createdAt: "desc" },
+			take: 10,
+		});
+
+		return announcements.map((a) => ({
+			id: a.id,
+			title: a.title,
+			message: a.content,
+			createdAt: a.createdAt,
+			priority: a.isPinned ? "HIGH" : "NORMAL",
+		}));
+	}
+
+	/**
+	 * Helper to get linked student IDs
+	 */
+	private async getLinkedStudentIds(parentId: string): Promise<string[]> {
+		const links = await this.prisma.studentParent.findMany({
+			where: { parentId, isVerified: true },
+			select: { studentId: true },
+		});
+		return links.map((l) => l.studentId);
+	}
 }

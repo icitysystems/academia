@@ -1,5 +1,5 @@
-﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql"
-import { GraphQLJSON } from 'graphql-type-json';
+﻿import { Resolver, Query, Mutation, Args, ID, Int } from "@nestjs/graphql";
+import { GraphQLJSON } from "graphql-type-json";
 import { UseGuards } from "@nestjs/common";
 import { AlumniService } from "./alumni.service";
 import { GqlAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -58,6 +58,48 @@ export class AlumniResolver {
 	@UseGuards(GqlAuthGuard)
 	async getAlumniDashboard(@CurrentUser() user: any) {
 		return this.alumniService.getAlumniDashboard(user.sub);
+	}
+
+	// ============================
+	// Frontend Dashboard Queries
+	// ============================
+
+	@Query(() => GraphQLJSON)
+	@UseGuards(GqlAuthGuard)
+	async myTranscripts(@CurrentUser() user: any) {
+		return this.alumniService.getMyTranscripts(user.sub);
+	}
+
+	@Query(() => GraphQLJSON)
+	@UseGuards(GqlAuthGuard)
+	async myCertificates(@CurrentUser() user: any) {
+		return this.alumniService.getMyCertificates(user.sub);
+	}
+
+	@Query(() => GraphQLJSON)
+	@UseGuards(GqlAuthGuard)
+	async alumniNetwork(
+		@CurrentUser() user: any,
+		@Args("search", { nullable: true }) search?: string,
+	) {
+		return this.alumniService.getAlumniNetwork(user.sub, search);
+	}
+
+	@Query(() => GraphQLJSON)
+	async jobPostings() {
+		return this.alumniService.getJobPostings();
+	}
+
+	@Query(() => GraphQLJSON)
+	@UseGuards(GqlAuthGuard)
+	async alumniAnnouncements(@CurrentUser() user: any) {
+		return this.alumniService.getAlumniAnnouncements(user.sub);
+	}
+
+	@Query(() => GraphQLJSON)
+	@UseGuards(GqlAuthGuard)
+	async alumniPerks(@CurrentUser() user: any) {
+		return this.alumniService.getAlumniPerks(user.sub);
 	}
 
 	@Mutation(() => GraphQLJSON, { name: "updateAlumniProfile" })
@@ -194,5 +236,3 @@ export class AlumniResolver {
 		});
 	}
 }
-
-

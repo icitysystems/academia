@@ -125,6 +125,24 @@ export class UsersResolver {
 		return this.usersService.getStudentGrades(targetId);
 	}
 
+	@Query(() => GraphQLJSON, {
+		name: "myGrades",
+		description: "Get current student's grades summary for dashboard",
+	})
+	@Roles(UserRole.STUDENT)
+	async getMyGrades(@CurrentUser() user: any) {
+		return this.usersService.getMyGrades(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, {
+		name: "myPayments",
+		description: "Get current student's payment history for dashboard",
+	})
+	@Roles(UserRole.STUDENT)
+	async getMyPayments(@CurrentUser() user: any) {
+		return this.usersService.getMyPayments(user.sub);
+	}
+
 	@Mutation(() => GraphQLJSON, { name: "requestTranscript" })
 	@Roles(UserRole.STUDENT)
 	async requestTranscript(
@@ -185,6 +203,54 @@ export class UsersResolver {
 		return this.usersService.getAdminDashboard(user.sub);
 	}
 
+	// Frontend Admin Dashboard Queries
+	@Query(() => GraphQLJSON, { name: "systemStats" })
+	@Roles(UserRole.ADMIN)
+	async getSystemStats(@CurrentUser() user: any) {
+		return this.usersService.getSystemStats(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, { name: "recentUsers" })
+	@Roles(UserRole.ADMIN)
+	async getRecentUsers(@CurrentUser() user: any) {
+		return this.usersService.getRecentUsers(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, { name: "recentEnrollments" })
+	@Roles(UserRole.ADMIN)
+	async getRecentEnrollments(@CurrentUser() user: any) {
+		return this.usersService.getRecentEnrollments(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, { name: "pendingApprovals" })
+	@Roles(UserRole.ADMIN)
+	async getPendingApprovals(@CurrentUser() user: any) {
+		return this.usersService.getPendingApprovals(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, { name: "systemAlerts" })
+	@Roles(UserRole.ADMIN)
+	async getSystemAlerts(@CurrentUser() user: any) {
+		return this.usersService.getSystemAlerts(user.sub);
+	}
+
+	@Query(() => GraphQLJSON, { name: "allUsers" })
+	@Roles(UserRole.ADMIN)
+	async getAllUsers(
+		@CurrentUser() user: any,
+		@Args("role", { nullable: true }) role?: string,
+		@Args("search", { nullable: true }) search?: string,
+		@Args("page", { type: () => Int, nullable: true }) page?: number,
+		@Args("limit", { type: () => Int, nullable: true }) limit?: number,
+	) {
+		return this.usersService.getAllUsers(user.sub, {
+			role,
+			search,
+			page,
+			limit,
+		});
+	}
+
 	@Query(() => GraphQLJSON, { name: "institutionalReport" })
 	@Roles(UserRole.ADMIN)
 	async generateInstitutionalReport(
@@ -242,5 +308,143 @@ export class UsersResolver {
 	) {
 		return this.usersService.getStudentProgressForParent(user.sub, studentId);
 	}
-}
 
+	// ============================
+	// ADMISSIONS WORKFLOW (Spec 3A.2)
+	// ============================
+
+	/**
+	 * Create admission application
+	 * As per Spec 3A.2: "Admissions management"
+	 */
+	@Mutation(() => GraphQLJSON, { name: "createAdmissionApplication" })
+	async createAdmissionApplication(
+		@Args("email") email: string,
+		@Args("name") name: string,
+		@Args("program") program: string,
+		@Args("firstName", { nullable: true }) firstName?: string,
+		@Args("lastName", { nullable: true }) lastName?: string,
+		@Args("phone", { nullable: true }) phone?: string,
+		@CurrentUser() user?: any,
+	) {
+		return this.usersService.createAdmissionApplication(
+			{ email, name, firstName, lastName, phone, program },
+			user?.sub,
+		);
+	}
+
+	/**
+	 * Review admission application - Admin only
+	 */
+	@Mutation(() => GraphQLJSON, { name: "reviewAdmissionApplication" })
+	@Roles(UserRole.ADMIN)
+	async reviewAdmissionApplication(
+		@Args("applicationId", { type: () => ID }) applicationId: string,
+		@Args("decision") decision: string,
+		@Args("notes", { nullable: true }) notes: string,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.reviewAdmissionApplication(applicationId, {
+			decision: decision as any,
+			notes,
+			reviewerId: user.sub,
+		});
+	}
+
+	/**
+	 * Get admission applications - Admin only
+	 */
+	@Query(() => GraphQLJSON, { name: "admissionApplications" })
+	@Roles(UserRole.ADMIN)
+	async getAdmissionApplications(
+		@CurrentUser() user: any,
+		@Args("status", { nullable: true }) status?: string,
+		@Args("program", { nullable: true }) program?: string,
+		@Args("startDate", { type: () => Date, nullable: true }) startDate?: Date,
+		@Args("endDate", { type: () => Date, nullable: true }) endDate?: Date,
+	) {
+		return this.usersService.getAdmissionApplications(user.sub, {
+			status,
+			program,
+			startDate,
+			endDate,
+		});
+	}
+
+	/**
+	 * Bulk import students - Admin only
+	 */
+	@Mutation(() => GraphQLJSON, { name: "bulkImportStudents" })
+	@Roles(UserRole.ADMIN)
+	async bulkImportStudents(
+		@Args("students", { type: () => GraphQLJSON })
+		students: Array<{
+			email: string;
+			name: string;
+			firstName?: string;
+			lastName?: string;
+			program?: string;
+		}>,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.bulkImportStudents(user.sub, students);
+	}
+
+	// ============================
+	// GRADUATION MANAGEMENT (Spec 3A.2)
+	// ============================
+
+	/**
+	 * Get graduation candidates - Admin only
+	 * As per Spec 3A.2: "Graduation processing"
+	 */
+	@Query(() => GraphQLJSON, { name: "graduationCandidates" })
+	@Roles(UserRole.ADMIN)
+	async getGraduationCandidates(
+		@CurrentUser() user: any,
+		@Args("program", { nullable: true }) program?: string,
+		@Args("graduationDate", { type: () => Date, nullable: true })
+		graduationDate?: Date,
+	) {
+		return this.usersService.getGraduationCandidates(user.sub, {
+			program,
+			graduationDate,
+		});
+	}
+
+	/**
+	 * Process graduation for a student - Admin only
+	 */
+	@Mutation(() => GraphQLJSON, { name: "processGraduation" })
+	@Roles(UserRole.ADMIN)
+	async processGraduation(
+		@Args("studentId", { type: () => ID }) studentId: string,
+		@Args("graduationDate", { type: () => Date }) graduationDate: Date,
+		@CurrentUser() user: any,
+		@Args("honors", { nullable: true }) honors?: string,
+		@Args("program", { nullable: true }) program?: string,
+	) {
+		return this.usersService.processGraduation(user.sub, studentId, {
+			graduationDate,
+			honors,
+			program,
+		});
+	}
+
+	/**
+	 * Bulk process graduations - Admin only
+	 */
+	@Mutation(() => GraphQLJSON, { name: "bulkProcessGraduation" })
+	@Roles(UserRole.ADMIN)
+	async bulkProcessGraduation(
+		@Args("studentIds", { type: () => [ID] }) studentIds: string[],
+		@Args("graduationDate", { type: () => Date }) graduationDate: Date,
+		@CurrentUser() user: any,
+	) {
+		return this.usersService.bulkProcessGraduation(
+			user.sub,
+			studentIds,
+			graduationDate,
+		);
+	}
+}

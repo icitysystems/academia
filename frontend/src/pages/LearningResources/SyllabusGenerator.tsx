@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
 import {
   Container,
   Typography,
@@ -24,6 +25,10 @@ import {
   ListItemSecondaryAction,
   Divider,
   Alert,
+  Snackbar,
+  CircularProgress,
+  Tab,
+  Tabs,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -32,6 +37,11 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import DownloadIcon from '@mui/icons-material/Download';
+import {
+  GET_SYLLABI,
+  CREATE_SYLLABUS,
+  IMPORT_SYLLABUS,
+} from '../../graphql/operations';
 
 const steps = ['Basic Information', 'Topics & Units', 'Time Allocation', 'Review & Generate'];
 
@@ -43,8 +53,21 @@ interface Topic {
   subtopics: string[];
 }
 
+interface Syllabus {
+  id: string;
+  subject: string;
+  gradeLevel: string;
+  academicYear: string;
+  term: string;
+  board: string;
+  topics: Topic[];
+  status: string;
+  createdAt: string;
+}
+
 const SyllabusGenerator: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
+  const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     subject: '',
     gradeLevel: '',
@@ -62,6 +85,59 @@ const SyllabusGenerator: React.FC = () => {
     },
   ]);
   const [newTopic, setNewTopic] = useState({ title: '', description: '', hours: 2 });
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // GraphQL queries and mutations
+  const { data: syllabiData, loading: syllabiLoading, refetch } = useQuery(GET_SYLLABI);
+  
+  const [createSyllabus, { loading: creating }] = useMutation(CREATE_SYLLABUS, {
+    onCompleted: () => {
+      setSnackbar({ open: true, message: 'Syllabus created successfully!', severity: 'success' });
+      refetch();
+      // Reset form
+      setActiveStep(0);
+      setFormData({ subject: '', gradeLevel: '', academicYear: '', term: '', board: '' });
+      setTopics([{
+        id: '1',
+        title: 'Introduction to the Subject',
+        description: 'Overview and foundational concepts',
+        hours: 4,
+        subtopics: ['Course overview', 'Learning objectives', 'Assessment criteria'],
+      }]);
+    },
+    onError: (error) => {
+      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+    },
+  });
+
+  const [importSyllabus, { loading: importing }] = useMutation(IMPORT_SYLLABUS, {
+    onCompleted: (data) => {
+      setSnackbar({ open: true, message: 'Syllabus imported successfully!', severity: 'success' });
+      // Populate form with imported data
+      if (data?.importSyllabus) {
+        const imported = data.importSyllabus;
+        setFormData({
+          subject: imported.subject || '',
+          gradeLevel: imported.gradeLevel || '',
+          academicYear: imported.academicYear || '',
+          term: imported.term || '',
+          board: imported.board || '',
+        });
+        if (imported.topics) {
+          setTopics(imported.topics);
+        }
+      }
+      refetch();
+    },
+    onError: (error) => {
+      setSnackbar({ open: true, message: `Import error: ${error.message}`, severity: 'error' });
+    },
+  });
 
   const handleNext = () => setActiveStep((prev) => prev + 1);
   const handleBack = () => setActiveStep((prev) => prev - 1);
@@ -84,6 +160,61 @@ const SyllabusGenerator: React.FC = () => {
     setTopics(topics.filter((t) => t.id !== id));
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) {
+      setSnackbar({ open: true, message: 'Please select a file to import', severity: 'error' });
+      return;
+    }
+
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      await importSyllabus({
+        variables: {
+          input: {
+            file: base64.split(',')[1], // Remove data:application/... prefix
+            fileName: selectedFile.name,
+            mimeType: selectedFile.type,
+          },
+        },
+      });
+    };
+    reader.readAsDataURL(selectedFile);
+  };
+
+  const handleGenerateSyllabus = async () => {
+    if (!formData.subject || !formData.gradeLevel) {
+      setSnackbar({ open: true, message: 'Please fill in required fields', severity: 'error' });
+      return;
+    }
+
+    await createSyllabus({
+      variables: {
+        input: {
+          subject: formData.subject,
+          gradeLevel: formData.gradeLevel,
+          academicYear: formData.academicYear,
+          term: formData.term,
+          board: formData.board,
+          topics: topics.map(t => ({
+            title: t.title,
+            description: t.description,
+            hours: t.hours,
+            subtopics: t.subtopics,
+          })),
+        },
+      },
+    });
+  };
+
   const totalHours = topics.reduce((sum, t) => sum + t.hours, 0);
 
   const renderStepContent = (step: number) => {
@@ -98,10 +229,11 @@ const SyllabusGenerator: React.FC = () => {
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 placeholder="e.g., Mathematics, Physics, English"
+                required
               />
             </Grid>
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth required>
                 <InputLabel>Grade Level</InputLabel>
                 <Select
                   value={formData.gradeLevel}
@@ -162,13 +294,39 @@ const SyllabusGenerator: React.FC = () => {
               <Alert severity="info">
                 You can also import an existing syllabus document (PDF, DOCX, or Excel) to auto-populate topics.
               </Alert>
-              <Button
-                variant="outlined"
-                startIcon={<CloudUploadIcon />}
-                sx={{ mt: 2 }}
-              >
-                Import Syllabus Document
-              </Button>
+              <Box mt={2} display="flex" gap={2} alignItems="center">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.doc,.xls"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  id="syllabus-import-input"
+                />
+                <label htmlFor="syllabus-import-input">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<CloudUploadIcon />}
+                  >
+                    Select File
+                  </Button>
+                </label>
+                {selectedFile && (
+                  <>
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedFile.name}
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      onClick={handleImport}
+                      disabled={importing}
+                      startIcon={importing ? <CircularProgress size={16} /> : null}
+                    >
+                      {importing ? 'Importing...' : 'Import'}
+                    </Button>
+                  </>
+                )}
+              </Box>
             </Grid>
           </Grid>
         );
@@ -293,6 +451,12 @@ const SyllabusGenerator: React.FC = () => {
                           value={topic.hours}
                           size="small"
                           sx={{ width: 100 }}
+                          onChange={(e) => {
+                            const newHours = parseInt(e.target.value) || 0;
+                            setTopics(topics.map(t => 
+                              t.id === topic.id ? { ...t, hours: newHours } : t
+                            ));
+                          }}
                         />
                       </Box>
                     </CardContent>
@@ -364,6 +528,8 @@ const SyllabusGenerator: React.FC = () => {
     }
   };
 
+  const existingSyllabi: Syllabus[] = syllabiData?.syllabi || [];
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" alignItems="center" mb={3}>
@@ -375,32 +541,103 @@ const SyllabusGenerator: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+      <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb: 3 }}>
+        <Tab label="Create New" />
+        <Tab label={`My Syllabi (${existingSyllabi.length})`} />
+      </Tabs>
 
-        {renderStepContent(activeStep)}
+      {tabValue === 0 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
 
-        <Box display="flex" justifyContent="space-between" mt={4}>
-          <Button
-            disabled={activeStep === 0}
-            onClick={handleBack}
-          >
-            Back
-          </Button>
-          <Button
-            variant="contained"
-            onClick={activeStep === steps.length - 1 ? () => alert('Syllabus Generated!') : handleNext}
-          >
-            {activeStep === steps.length - 1 ? 'Generate Syllabus' : 'Next'}
-          </Button>
-        </Box>
-      </Paper>
+          {renderStepContent(activeStep)}
+
+          <Box display="flex" justifyContent="space-between" mt={4}>
+            <Button
+              disabled={activeStep === 0}
+              onClick={handleBack}
+            >
+              Back
+            </Button>
+            <Button
+              variant="contained"
+              onClick={activeStep === steps.length - 1 ? handleGenerateSyllabus : handleNext}
+              disabled={creating}
+              startIcon={creating ? <CircularProgress size={16} /> : null}
+            >
+              {activeStep === steps.length - 1 ? (creating ? 'Creating...' : 'Generate Syllabus') : 'Next'}
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
+      {tabValue === 1 && (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Saved Syllabi
+          </Typography>
+          {syllabiLoading ? (
+            <Box display="flex" justifyContent="center" p={4}>
+              <CircularProgress />
+            </Box>
+          ) : existingSyllabi.length === 0 ? (
+            <Alert severity="info">
+              No syllabi created yet. Create your first syllabus using the wizard.
+            </Alert>
+          ) : (
+            <Grid container spacing={2}>
+              {existingSyllabi.map((syllabus) => (
+                <Grid item xs={12} md={6} key={syllabus.id}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography variant="h6">{syllabus.subject}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {syllabus.gradeLevel} • {syllabus.academicYear}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={syllabus.status}
+                          color={syllabus.status === 'APPROVED' ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </Box>
+                      <Box mt={2}>
+                        <Typography variant="body2">
+                          <strong>{syllabus.topics?.length || 0}</strong> topics • 
+                          <strong> {syllabus.topics?.reduce((sum, t) => sum + t.hours, 0) || 0}</strong> hours
+                        </Typography>
+                      </Box>
+                      <Box mt={2} display="flex" gap={1}>
+                        <Button size="small" variant="outlined">View</Button>
+                        <Button size="small" startIcon={<DownloadIcon />}>Export</Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Paper>
+      )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

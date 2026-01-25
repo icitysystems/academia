@@ -1,0 +1,58 @@
+{
+	"expo": {
+		"name": "Academia Mobile",
+		"slug": "academia-mobile",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "automatic",
+		"splash": {
+			"image": "./assets/splash.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#1976d2"
+		},
+		"assetBundlePatterns": ["**/*"],
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.academia.mobile",
+			"infoPlist": {
+				"NSCameraUsageDescription": "Allow Academia to access camera for live sessions and document scanning.",
+				"NSMicrophoneUsageDescription": "Allow Academia to access microphone for live sessions.",
+				"NSPhotoLibraryUsageDescription": "Allow Academia to access photos for profile and assignments."
+			}
+		},
+		"android": {
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/adaptive-icon.png",
+				"backgroundColor": "#1976d2"
+			},
+			"package": "com.academia.mobile",
+			"permissions": [
+				"CAMERA",
+				"RECORD_AUDIO",
+				"READ_EXTERNAL_STORAGE",
+				"WRITE_EXTERNAL_STORAGE"
+			]
+		},
+		"web": {
+			"favicon": "./assets/favicon.png"
+		},
+		"plugins": [
+			"expo-camera",
+			"expo-av",
+			[
+				"expo-notifications",
+				{
+					"icon": "./assets/notification-icon.png",
+					"color": "#1976d2"
+				}
+			]
+		],
+		"extra": {
+			"apiUrl": "https://api.academia.com/graphql",
+			"eas": {
+				"projectId": "your-project-id"
+			}
+		}
+	}
+}
