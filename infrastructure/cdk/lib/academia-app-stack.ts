@@ -29,7 +29,7 @@ export interface AcademiaAppStackProps extends cdk.StackProps {
 /**
  * Academia Application Stack (per environment)
  *
- * Uses shared Aurora database with separate database per environment.
+ * Uses RDS PostgreSQL db.t3.micro (icitysystems) with 'academia' database.
  *
  * AWS Services:
  * - Lambda (backend API)
@@ -37,7 +37,7 @@ export interface AcademiaAppStackProps extends cdk.StackProps {
  * - S3 (file storage)
  * - Route53 (DNS)
  * - ACM (SSL certificates)
- * - Secrets Manager (app secrets only - DB secret is shared)
+ * - Secrets Manager (production environment variables & DB credentials)
  */
 export class AcademiaAppStack extends cdk.Stack {
 	public readonly apiUrl: string;
@@ -53,8 +53,8 @@ export class AcademiaAppStack extends cdk.Stack {
 		const fullDomain = `${props.subdomain}.${props.domainName}`;
 		const apiDomain = `api.${fullDomain}`;
 
-		// Database name per environment
-		const databaseName = `academia_${envName}`;
+		// Database name - single database for all environments on icitysystems RDS instance
+		const databaseName = "academia";
 
 		// Import shared VPC
 		const vpc = props.sharedVpc;
@@ -199,7 +199,7 @@ export class AcademiaAppStack extends cdk.Stack {
 				FRONTEND_URL: `https://${fullDomain}`,
 				CORS_ORIGINS: `https://${fullDomain},http://localhost:3000`,
 
-				// Database (shared cluster, separate database)
+				// Database (icitysystems RDS instance - academia database)
 				DB_SECRET_ARN: props.dbSecretArn,
 				DB_HOST: props.dbEndpoint,
 				DB_PORT: props.dbPort,

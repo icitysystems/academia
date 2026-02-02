@@ -8,7 +8,9 @@
 #   tag v* → Production (manual approval)
 #
 # Environments: dev1, dev2, testing, staging, production
-# AWS Services: Lambda, API Gateway, S3, Route53, Aurora Serverless, CloudFront, ACM
+# AWS Services: Lambda, API Gateway, S3, Route53, RDS PostgreSQL (icitysystems), CloudFront, ACM
+# Database: academia (on RDS db.t3.micro instance: icitysystems)
+# Secrets: AWS Secrets Manager for production environment variables
 # =============================================================================
 
 name: CI/CD Pipeline
@@ -32,6 +34,8 @@ concurrency:
 env:
   NODE_VERSION: "20"
   AWS_REGION: us-east-1
+  DATABASE_NAME: academia
+  RDS_INSTANCE: icitysystems
 
 # =============================================================================
 # JOBS
@@ -86,13 +90,19 @@ jobs:
         working-directory: backend
         run: npm run build
 
-      - name: Package Lambda
+      - name: Copy production Prisma schema
+        working-directory: backend
+        run: |
+          cp prisma/schema.production.prisma prisma/schema.prisma
+          npx prisma generate
+
+      - name: Package Lambda (source only - no node_modules)
         working-directory: backend
         run: |
           mkdir -p lambda-package
           cp -r dist lambda-package/
-          cp -r node_modules lambda-package/
           cp package.json lambda-package/
+          cp package-lock.json lambda-package/
           cp -r prisma lambda-package/
           cd lambda-package && zip -r ../backend-lambda.zip .
 
@@ -443,10 +453,102 @@ jobs:
           ENV="${{ needs.determine-environment.outputs.environment }}"
           FUNCTION_NAME="academia-backend-${ENV}"
 
+          # Extract artifact
+          cd artifacts
+          unzip -o backend-lambda.zip -d lambda-extracted
+          cd lambda-extracted
+
+          # Install production dependencies on AWS (not from dev node_modules)
+          echo "Installing production dependencies..."
+          npm ci --production --ignore-scripts
+
+          # Generate Prisma client for production
+          npx prisma generate
+
+          # Repackage with production node_modules
+          zip -r ../lambda-production.zip .
+          cd ..
+
+          # Update Lambda function code
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
-            --zip-file fileb://artifacts/backend-lambda.zip \
+            --zip-file fileb://lambda-production.zip \
             --publish
+
+      - name: Configure production secrets in AWS Secrets Manager
+        run: |
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          
+          # Get database credentials from Secrets Manager
+          DB_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id "academia/shared/database/credentials" \
+            --query 'SecretString' --output text 2>/dev/null || echo "{}")
+          
+          if [ "$DB_SECRET" != "{}" ]; then
+            DB_USER=$(echo $DB_SECRET | jq -r '.username // "academia_admin"')
+            DB_PASS=$(echo $DB_SECRET | jq -r '.password // empty')
+            
+            # Get RDS endpoint
+            DB_ENDPOINT=$(aws rds describe-db-instances \
+              --db-instance-identifier ${{ env.RDS_INSTANCE }} \
+              --query 'DBInstances[0].Endpoint.Address' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$DB_ENDPOINT" ] && [ -n "$DB_PASS" ]; then
+              # Create/Update environment-specific secret with DATABASE_URL
+              DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_ENDPOINT}:5432/${{ env.DATABASE_NAME }}"
+              
+              aws secretsmanager put-secret-value \
+                --secret-id "academia/${ENV}/database-url" \
+                --secret-string "{\"DATABASE_URL\": \"${DATABASE_URL}\"}" 2>/dev/null || \
+              aws secretsmanager create-secret \
+                --name "academia/${ENV}/database-url" \
+                --description "Academia ${ENV} database connection URL" \
+                --secret-string "{\"DATABASE_URL\": \"${DATABASE_URL}\"}"
+              
+              echo "✅ Production DATABASE_URL configured in Secrets Manager"
+            fi
+          fi
+          
+          # Ensure JWT secret exists
+          aws secretsmanager describe-secret \
+            --secret-id "academia/${ENV}/jwt-secret" 2>/dev/null || \
+          aws secretsmanager create-secret \
+            --name "academia/${ENV}/jwt-secret" \
+            --description "Academia ${ENV} JWT secret" \
+            --generate-secret-string '{"PasswordLength":64,"ExcludePunctuation":true}'
+          
+          echo "✅ Production secrets configured in AWS Secrets Manager"
+
+      - name: Update Lambda environment variables from Secrets Manager
+        run: |
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          FUNCTION_NAME="academia-backend-${ENV}"
+          
+          # Get current Lambda configuration
+          CURRENT_ENV=$(aws lambda get-function-configuration \
+            --function-name $FUNCTION_NAME \
+            --query 'Environment.Variables' \
+            --output json)
+          
+          # Get database URL from Secrets Manager
+          DB_URL_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id "academia/${ENV}/database-url" \
+            --query 'SecretString' --output text 2>/dev/null || echo "{}")
+          
+          if [ "$DB_URL_SECRET" != "{}" ]; then
+            DATABASE_URL=$(echo $DB_URL_SECRET | jq -r '.DATABASE_URL // empty')
+            
+            if [ -n "$DATABASE_URL" ]; then
+              # Update Lambda environment with resolved DATABASE_URL
+              aws lambda update-function-configuration \
+                --function-name $FUNCTION_NAME \
+                --environment "Variables={NODE_ENV=production,DATABASE_URL=${DATABASE_URL},ENVIRONMENT=${ENV}}" \
+                --output text > /dev/null
+              
+              echo "✅ Lambda environment variables updated from Secrets Manager"
+            fi
+          fi
 
       - name: Deploy frontend to S3
         run: |
@@ -474,12 +576,11 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           FUNCTION_NAME="academia-backend-${ENV}"
-          DB_NAME="academia_${ENV}"
+          DB_NAME="${{ env.DATABASE_NAME }}"
 
-          echo "Running migrations for database: $DB_NAME"
+          echo "Running migrations for database: $DB_NAME on RDS instance: ${{ env.RDS_INSTANCE }}"
 
           # Invoke Lambda with migration command
-          # The Lambda will use the environment-specific database
           aws lambda invoke \
             --function-name $FUNCTION_NAME \
             --payload "{\"command\": \"migrate\", \"database\": \"$DB_NAME\"}" \

@@ -9,26 +9,19 @@ import { environments, EnvironmentConfig } from "../lib/config/environments";
 /**
  * Academia CDK Application
  *
- * Architecture: Shared Aurora db.t4g.micro across all environments with separate databases
+ * Architecture: RDS PostgreSQL db.t3.micro for production
  *
  * Stack hierarchy:
- * 1. SharedDatabaseStack - Single Aurora db.t4g.micro instance, shared VPC
+ * 1. SharedDatabaseStack - RDS PostgreSQL db.t3.micro instance (icitysystems)
  * 2. AcademiaAppStack (per env) - Lambda, API Gateway, S3 (uses shared DB)
  * 3. AcademiaFrontendStack (per env) - S3, CloudFront
  *
- * Databases per environment:
- * - academia_dev1
- * - academia_dev2
- * - academia_testing
- * - academia_staging
- * - academia_production
- *
- * Cost optimization: ~$51/month for all 5 environments with 1M total requests
+ * Database: academia
  *
  * AWS Services:
  * - Lambda (backend API)
  * - API Gateway (REST API)
- * - Aurora PostgreSQL db.t4g.micro (shared)
+ * - RDS PostgreSQL db.t3.micro
  * - S3 (assets + frontend)
  * - CloudFront (CDN)
  * - Route53 (DNS)
@@ -66,11 +59,11 @@ console.log(`
 `);
 
 // ============================================================================
-// Shared Database Stack (Single Aurora db.t4g.micro)
+// Shared Database Stack (RDS PostgreSQL db.t3.micro - icitysystems)
 // ============================================================================
 const sharedDbStack = new SharedDatabaseStack(app, "AcademiaSharedDatabase", {
 	env: awsEnv,
-	description: "Academia Shared Aurora PostgreSQL database (db.t4g.micro)",
+	description: "Academia RDS PostgreSQL database (db.t3.micro - icitysystems)",
 	tags: {
 		Application: "Academia",
 		Component: "SharedDatabase",
