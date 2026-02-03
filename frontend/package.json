@@ -73,5 +73,8 @@
 				"statements": 70
 			}
 		}
+	},
+	"overrides": {
+		"yaml": "^2.8.2"
 	}
 }

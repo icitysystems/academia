@@ -555,7 +555,7 @@ export class RealTimeCollaborationService {
 				op.version === operation.version - 1 && op.userId !== operation.userId,
 		);
 
-		let transformedOp = { ...operation };
+		const transformedOp = { ...operation };
 
 		for (const concurrent of concurrentOps) {
 			if (

@@ -453,7 +453,6 @@
     "FunctionName": "academia-backend-staging",
     "Handler": "dist/lambda.handler",
     "MemorySize": 1024,
-    "ReservedConcurrentExecutions": 50,
     "Role": {
      "Fn::GetAtt": [
       "BackendFunctionServiceRoleCA938F8D",

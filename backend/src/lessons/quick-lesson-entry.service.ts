@@ -522,7 +522,7 @@ export class QuickLessonEntryService {
 				const lessonDates = new Set(
 					lessons.map((l) => l.date.toISOString().split("T")[0]),
 				);
-				let current = new Date(startDate);
+				const current = new Date(startDate);
 
 				while (current <= endDate) {
 					const dayOfWeek = current.getDay();

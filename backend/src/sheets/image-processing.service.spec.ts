@@ -2,6 +2,8 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ImageProcessingService } from "./image-processing.service";
 import { ConfigService } from "@nestjs/config";
 import { StorageService } from "../storage/storage.service";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const sharp = require("sharp");
 
 describe("ImageProcessingService", () => {
 	let service: ImageProcessingService;
@@ -47,7 +49,6 @@ describe("ImageProcessingService", () => {
 	describe("preprocessImage", () => {
 		it("should process an image buffer", async () => {
 			// Create a simple 100x100 white PNG
-			const sharp = require("sharp");
 			const testImage = await sharp({
 				create: {
 					width: 100,
@@ -66,7 +67,6 @@ describe("ImageProcessingService", () => {
 		});
 
 		it("should apply preprocessing options", async () => {
-			const sharp = require("sharp");
 			const testImage = await sharp({
 				create: {
 					width: 50,
@@ -92,7 +92,6 @@ describe("ImageProcessingService", () => {
 
 	describe("generateThumbnail", () => {
 		it("should generate a thumbnail with specified width", async () => {
-			const sharp = require("sharp");
 			const testImage = await sharp({
 				create: {
 					width: 1000,
@@ -113,7 +112,6 @@ describe("ImageProcessingService", () => {
 
 	describe("detectHandwriting", () => {
 		it("should analyze image for handwriting detection", async () => {
-			const sharp = require("sharp");
 			const testImage = await sharp({
 				create: {
 					width: 500,

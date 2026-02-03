@@ -11,7 +11,10 @@ import { MLService } from "../ml/ml.service";
 export class GradingService {
 	private readonly logger = new Logger(GradingService.name);
 
-	constructor(private prisma: PrismaService, private mlService: MLService) {}
+	constructor(
+		private prisma: PrismaService,
+		private mlService: MLService,
+	) {}
 
 	/**
 	 * Start a batch grading job
@@ -72,6 +75,12 @@ export class GradingService {
 				try {
 					// Grade the sheet
 					const result = await this.mlService.gradeSheet(sheetId, job.modelId);
+
+					// Check if result is valid
+					if (!result || !result.predictions) {
+						this.logger.warn(`No predictions returned for sheet ${sheetId}`);
+						continue;
+					}
 
 					// Save results
 					for (const prediction of result.predictions) {

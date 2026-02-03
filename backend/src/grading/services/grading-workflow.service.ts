@@ -733,6 +733,28 @@ export class GradingWorkflowService {
 							markingScheme: expectedResponse?.markingScheme,
 						});
 
+						// Check if grading result is valid
+						if (!gradingResult) {
+							this.logger.warn(
+								`No grading result returned for question ${question.id} in submission ${submission.id}`,
+							);
+							// Create a placeholder response with 0 score and low confidence
+							await this.prisma.studentResponse.create({
+								data: {
+									submissionId: submission.id,
+									questionId: question.id,
+									extractedAnswer: null,
+									assignedScore: 0,
+									maxScore: question.marks,
+									predictedCorrectness: "SKIPPED",
+									confidence: 0,
+									explanation: "Unable to grade - ML service unavailable",
+									needsReview: true,
+								},
+							});
+							continue;
+						}
+
 						// Save response with confidence-based review priority (5A.5)
 						const needsReview = gradingResult.confidence < this.CONFIDENCE_HIGH;
 						const reviewPriority = this.calculateReviewPriority(

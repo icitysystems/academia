@@ -306,7 +306,6 @@
     "FunctionName": "academia-backend-production",
     "Handler": "dist/lambda.handler",
     "MemorySize": 2048,
-    "ReservedConcurrentExecutions": 100,
     "Role": {
      "Fn::GetAtt": [
       "BackendFunctionServiceRoleCA938F8D",
