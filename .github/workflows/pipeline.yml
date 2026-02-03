@@ -534,11 +534,11 @@ jobs:
 
           # Install production dependencies with minimal footprint
           echo "Installing production dependencies..."
-          npm ci --production --ignore-scripts --no-optional
+          npm ci --production --no-optional
           
           # Generate Prisma client BEFORE cleanup (uses installed prisma from node_modules)
           echo "Generating Prisma client..."
-          ./node_modules/.bin/prisma generate
+          node_modules/.bin/prisma generate
           
           # Clean up unnecessary files to reduce bundle size
           echo "Cleaning up unnecessary files..."
