@@ -26,6 +26,19 @@ on:
       - "v*"
   pull_request:
     branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for manual deployment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - dev1
+          - dev2
+          - testing
+          - staging
+          - production
 
 concurrency:
   group: pipeline-${{ github.ref }}
