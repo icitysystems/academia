@@ -523,7 +523,7 @@ jobs:
           if [ -z "$ASSETS_BUCKET" ] || [ "$ASSETS_BUCKET" = "None" ]; then
             ASSETS_BUCKET="academia-assets-staging-${{ secrets.AWS_ACCOUNT_ID }}"
           fi
-          
+
           echo "Using S3 bucket: $ASSETS_BUCKET"
 
           # Extract artifact
@@ -535,11 +535,11 @@ jobs:
           # Install production dependencies with minimal footprint
           echo "Installing production dependencies..."
           npm ci --production --no-optional
-          
+
           # Generate Prisma client BEFORE cleanup (uses installed prisma from node_modules)
           echo "Generating Prisma client..."
           node_modules/.bin/prisma generate
-          
+
           # Clean up unnecessary files to reduce bundle size
           echo "Cleaning up unnecessary files..."
           find node_modules -type f \( -name "*.md" -o -name "*.ts" -o -name "*.map" -o -name "LICENSE*" -o -name "CHANGELOG*" -o -name "README*" -o -name "*.d.ts" -o -name ".npmignore" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*" \) -delete 2>/dev/null || true
@@ -549,30 +549,41 @@ jobs:
           find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
           find node_modules -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
           rm -rf node_modules/.package-lock.json node_modules/.cache 2>/dev/null || true
-              # Create/Update environment-specific secret with DATABASE_URL
-              DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_ENDPOINT}:5432/${{ env.DATABASE_NAME }}"
-              
-              aws secretsmanager put-secret-value \
-                --secret-id "academia/${ENV}/database-url" \
-                --secret-string "{\"DATABASE_URL\": \"${DATABASE_URL}\"}" 2>/dev/null || \
-              aws secretsmanager create-secret \
-                --name "academia/${ENV}/database-url" \
-                --description "Academia ${ENV} database connection URL" \
-                --secret-string "{\"DATABASE_URL\": \"${DATABASE_URL}\"}"
-              
-              echo "✅ Production DATABASE_URL configured in Secrets Manager"
-            fi
+
+          # Zip the package
+          echo "Creating zip file..."
+          cd ..
+          rm -f backend-lambda-prepared.zip
+          cd lambda-extracted
+          zip -r ../backend-lambda-prepared.zip . -x "*.git*"
+          cd ..
+
+          # Check unzipped size
+          UNZIPPED_SIZE=$(du -sb lambda-extracted | cut -f1)
+          echo "Unzipped size: $UNZIPPED_SIZE bytes ($(($UNZIPPED_SIZE / 1024 / 1024)) MB)"
+          if [ $UNZIPPED_SIZE -gt 262144000 ]; then
+            echo "⚠️ Warning: Package may exceed Lambda's 250MB unzipped limit"
           fi
 
-          # Ensure JWT secret exists
-          aws secretsmanager describe-secret \
-            --secret-id "academia/${ENV}/jwt-secret" 2>/dev/null || \
-          aws secretsmanager create-secret \
-            --name "academia/${ENV}/jwt-secret" \
-            --description "Academia ${ENV} JWT secret" \
-            --generate-secret-string '{"PasswordLength":64,"ExcludePunctuation":true}'
+          # Upload to S3 first (for large packages)
+          ZIP_SIZE=$(stat --format=%s backend-lambda-prepared.zip 2>/dev/null || stat -f%z backend-lambda-prepared.zip)
+          echo "Zip size: $ZIP_SIZE bytes"
 
-          echo "✅ Production secrets configured in AWS Secrets Manager"
+          aws s3 cp backend-lambda-prepared.zip "s3://${ASSETS_BUCKET}/lambda/backend-lambda.zip"
+          echo "Uploaded Lambda code to S3"
+
+          # Update Lambda function to use S3 package
+          aws lambda update-function-code \
+            --function-name $FUNCTION_NAME \
+            --s3-bucket $ASSETS_BUCKET \
+            --s3-key "lambda/backend-lambda.zip"
+
+          echo "✅ Lambda code updated successfully from S3"
+
+          # Wait for update to complete
+          aws lambda wait function-updated --function-name $FUNCTION_NAME || true
+
+          echo "✅ Lambda function update completed"
 
       - name: Update Lambda environment variables from Secrets Manager
         run: |
