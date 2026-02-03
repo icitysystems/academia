@@ -536,6 +536,10 @@ jobs:
           echo "Installing production dependencies..."
           npm ci --production --ignore-scripts --no-optional
           
+          # Generate Prisma client BEFORE cleanup (uses installed prisma from node_modules)
+          echo "Generating Prisma client..."
+          ./node_modules/.bin/prisma generate
+          
           # Clean up unnecessary files to reduce bundle size
           echo "Cleaning up unnecessary files..."
           find node_modules -type f \( -name "*.md" -o -name "*.ts" -o -name "*.map" -o -name "LICENSE*" -o -name "CHANGELOG*" -o -name "README*" -o -name "*.d.ts" -o -name ".npmignore" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*" \) -delete 2>/dev/null || true
@@ -545,37 +549,6 @@ jobs:
           find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
           find node_modules -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
           rm -rf node_modules/.package-lock.json node_modules/.cache 2>/dev/null || true
-
-          # Generate Prisma client for production
-          npx prisma generate
-
-          # Repackage with production node_modules
-          zip -r -q ../lambda-production.zip .
-          cd ..
-          
-          # Get zip file size
-          ZIPSIZE=$(stat -c%s lambda-production.zip 2>/dev/null || stat -f%z lambda-production.zip)
-          echo "Lambda package size: $ZIPSIZE bytes ($(($ZIPSIZE / 1024 / 1024)) MB)"
-          
-          # Upload to S3 and deploy
-          echo "Uploading to S3..."
-          S3_KEY="lambda/backend-${ENV}-$(date +%s).zip"
-          aws s3 cp lambda-production.zip "s3://${ASSETS_BUCKET}/${S3_KEY}"
-          
-          # Update Lambda function code from S3
-          aws lambda update-function-code \
-            --function-name $FUNCTION_NAME \
-            --s3-bucket "$ASSETS_BUCKET" \
-            --s3-key "$S3_KEY" \
-            --publish
-            
-            # Get RDS endpoint
-            DB_ENDPOINT=$(aws rds describe-db-instances \
-              --db-instance-identifier ${{ env.RDS_INSTANCE }} \
-              --query 'DBInstances[0].Endpoint.Address' \
-              --output text 2>/dev/null || echo "")
-            
-            if [ -n "$DB_ENDPOINT" ] && [ -n "$DB_PASS" ]; then
               # Create/Update environment-specific secret with DATABASE_URL
               DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_ENDPOINT}:5432/${{ env.DATABASE_NAME }}"
               
