@@ -581,8 +581,9 @@ jobs:
             find node_modules/@prisma/client -type f -name "*migration*engine*" -delete 2>/dev/null || true
           fi
 
-          # Remove source directories (keep only dist/lib)
-          find node_modules -type d \( -name "src" -o -name "source" \) -exec rm -rf {} + 2>/dev/null || true
+          # NOTE: Do NOT remove src directories as some packages (like debug) have main entry in src/
+          # Only remove specific large source directories that aren't needed at runtime
+          rm -rf node_modules/typescript/lib 2>/dev/null || true
 
           # Remove cache and package locks
           rm -rf node_modules/.package-lock.json node_modules/.cache node_modules/.bin/tsc 2>/dev/null || true
