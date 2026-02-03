@@ -483,7 +483,7 @@ jobs:
           # Capitalize first letter for stack name
           ENV_CAPITALIZED="$(echo ${ENV:0:1} | tr '[:lower:]' '[:upper:]')${ENV:1}"
 
-          # Check if shared database stack exists
+          # Check if shared database stack exists and is stable
           SHARED_DB_STATUS=$(aws cloudformation describe-stacks --stack-name AcademiaSharedDatabase --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
           
           if [ "$SHARED_DB_STATUS" = "NOT_FOUND" ] || [ "$SHARED_DB_STATUS" = "ROLLBACK_COMPLETE" ]; then
@@ -492,14 +492,15 @@ jobs:
               --require-approval never \
               --outputs-file shared-db-outputs.json
           else
-            echo "Shared database stack already exists (status: $SHARED_DB_STATUS), skipping..."
+            echo "Shared database stack already exists (status: $SHARED_DB_STATUS), skipping deployment..."
           fi
 
-          # Deploy environment-specific stacks
+          # Deploy environment-specific stacks using --exclusively to avoid re-deploying shared database
           echo "Deploying backend and frontend for $ENV..."
           npx cdk deploy "AcademiaBackend-${ENV_CAPITALIZED}" "AcademiaFrontend-${ENV_CAPITALIZED}" \
             --context environment=$ENV \
             --require-approval never \
+            --exclusively \
             --outputs-file cdk-outputs.json
 
           # Extract outputs
