@@ -552,6 +552,10 @@ jobs:
           # Remove docs and examples
           find node_modules -type d \( -name "docs" -o -name "doc" -o -name "examples" -o -name "example" -o -name "samples" -o -name "demo" \) -exec rm -rf {} + 2>/dev/null || true
 
+          # Remove aws-sdk v2 (Lambda already has it, and we use aws-sdk v3)
+          echo "Removing aws-sdk v2 (provided by Lambda runtime)..."
+          rm -rf node_modules/aws-sdk 2>/dev/null || true
+
           # Aggressively clean Prisma - keep only what's needed for Lambda runtime
           echo "Cleaning up Prisma engines (keeping only rhel-openssl for Lambda)..."
           
@@ -588,6 +592,16 @@ jobs:
           
           # Remove @nestjs/schematics if present (dev tool)
           rm -rf node_modules/@nestjs/schematics 2>/dev/null || true
+          
+          # Remove TensorFlow.js (heavy, and likely only used for ML features that can be moved to separate Lambda)
+          echo "Removing TensorFlow.js (too large for Lambda)..."
+          rm -rf node_modules/@tensorflow 2>/dev/null || true
+          rm -rf node_modules/tfjs-node 2>/dev/null || true
+          
+          # Remove tesseract.js (OCR - heavy)
+          echo "Removing tesseract.js (too large for Lambda)..."
+          rm -rf node_modules/tesseract.js 2>/dev/null || true
+          rm -rf node_modules/tesseract.js-core 2>/dev/null || true
           
           # Remove sharp's libvips binaries for other platforms
           if [ -d "node_modules/sharp" ]; then
