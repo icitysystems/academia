@@ -558,11 +558,11 @@ jobs:
 
           # Aggressively clean Prisma - keep only what's needed for Lambda runtime
           echo "Cleaning up Prisma engines (keeping only rhel-openssl for Lambda)..."
-          
+
           # Remove Prisma CLI completely (only needed for generate, not runtime)
           rm -rf node_modules/prisma 2>/dev/null || true
           rm -rf node_modules/@prisma/engines 2>/dev/null || true
-          
+
           # In @prisma/client, remove all query engines EXCEPT rhel-openssl-3.0.x (for Amazon Linux 2023)
           # The engines are in @prisma/client/runtime/
           if [ -d "node_modules/@prisma/client" ]; then
@@ -580,7 +580,7 @@ jobs:
             # Remove migration engine (not needed at runtime)  
             find node_modules/@prisma/client -type f -name "*migration*engine*" -delete 2>/dev/null || true
           fi
-          
+
           # Remove source directories (keep only dist/lib)
           find node_modules -type d \( -name "src" -o -name "source" \) -exec rm -rf {} + 2>/dev/null || true
 
@@ -589,20 +589,20 @@ jobs:
 
           # Remove unnecessary graphql packages' nested modules
           rm -rf node_modules/graphql/node_modules 2>/dev/null || true
-          
+
           # Remove @nestjs/schematics if present (dev tool)
           rm -rf node_modules/@nestjs/schematics 2>/dev/null || true
-          
+
           # Remove TensorFlow.js (heavy, and likely only used for ML features that can be moved to separate Lambda)
           echo "Removing TensorFlow.js (too large for Lambda)..."
           rm -rf node_modules/@tensorflow 2>/dev/null || true
           rm -rf node_modules/tfjs-node 2>/dev/null || true
-          
+
           # Remove tesseract.js (OCR - heavy)
           echo "Removing tesseract.js (too large for Lambda)..."
           rm -rf node_modules/tesseract.js 2>/dev/null || true
           rm -rf node_modules/tesseract.js-core 2>/dev/null || true
-          
+
           # Remove sharp's libvips binaries for other platforms
           if [ -d "node_modules/sharp" ]; then
             find node_modules/sharp -type f -name "*.node" | while read f; do
@@ -615,7 +615,7 @@ jobs:
           # Show disk usage of largest directories
           echo "Largest directories in node_modules:"
           du -sh node_modules/*/ 2>/dev/null | sort -hr | head -20 || true
-          
+
           # Show Prisma client size
           echo "Prisma client size:"
           du -sh node_modules/@prisma/client 2>/dev/null || echo "Not found"

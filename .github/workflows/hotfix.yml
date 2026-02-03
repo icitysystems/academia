@@ -30,22 +30,22 @@ jobs:
   # ===========================================================================
   # Validate Hotfix
   # ===========================================================================
-  
+
   validate:
     name: Validate Hotfix
     runs-on: ubuntu-latest
     outputs:
       proceed: ${{ steps.check.outputs.proceed }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Check branch
         id: check
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
-          
+
           if [[ "$BRANCH" == hotfix/* ]]; then
             echo "✅ Valid hotfix branch: $BRANCH"
             echo "proceed=true" >> $GITHUB_OUTPUT
@@ -54,12 +54,12 @@ jobs:
             echo "proceed=false" >> $GITHUB_OUTPUT
             exit 1
           fi
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Quick validation
         run: |
           cd backend
@@ -71,7 +71,7 @@ jobs:
   # ===========================================================================
   # Fast Deploy to Staging
   # ===========================================================================
-  
+
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
@@ -80,23 +80,23 @@ jobs:
     environment:
       name: staging
       url: https://staging.academia.icitysystems.org
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Build and package
         run: |
           cd backend
@@ -104,24 +104,24 @@ jobs:
           cp prisma/schema.production.prisma prisma/schema.prisma
           npx prisma generate
           npm run build
-          
+
           mkdir -p lambda-package
           cp -r dist lambda-package/
           cp package.json package-lock.json lambda-package/
           cp -r prisma lambda-package/
-          
+
           cd lambda-package
           npm ci --production --no-optional
           npx prisma generate
           zip -r ../hotfix-lambda.zip .
-      
+
       - name: Deploy Lambda
         run: |
           aws lambda update-function-code \
             --function-name academia-backend-staging \
             --zip-file fileb://backend/hotfix-lambda.zip \
             --publish
-      
+
       - name: Smoke test
         run: |
           sleep 10
@@ -130,7 +130,7 @@ jobs:
   # ===========================================================================
   # Production Deployment (with approval)
   # ===========================================================================
-  
+
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -138,23 +138,23 @@ jobs:
     environment:
       name: production
       url: https://academia.icitysystems.org
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Build and package
         run: |
           cd backend
@@ -162,29 +162,29 @@ jobs:
           cp prisma/schema.production.prisma prisma/schema.prisma
           npx prisma generate
           npm run build
-          
+
           mkdir -p lambda-package
           cp -r dist lambda-package/
           cp package.json package-lock.json lambda-package/
           cp -r prisma lambda-package/
-          
+
           cd lambda-package
           npm ci --production --no-optional
           npx prisma generate
           zip -r ../hotfix-lambda.zip .
-      
+
       - name: Deploy Lambda
         run: |
           aws lambda update-function-code \
             --function-name academia-backend-production \
             --zip-file fileb://backend/hotfix-lambda.zip \
             --publish
-      
+
       - name: Smoke test
         run: |
           sleep 10
           curl -f https://api.academia.icitysystems.org/health || echo "Health check pending"
-      
+
       - name: Post hotfix summary
         run: |
           echo "## 🚨 Hotfix Deployed to Production" >> $GITHUB_STEP_SUMMARY

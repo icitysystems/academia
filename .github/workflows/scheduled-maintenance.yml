@@ -31,15 +31,15 @@ jobs:
   # ===========================================================================
   # Security Scanning
   # ===========================================================================
-  
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     if: github.event.schedule == '0 2 * * *' || github.event.inputs.task == 'security-scan'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -48,13 +48,13 @@ jobs:
           severity: "CRITICAL,HIGH,MEDIUM"
           format: "sarif"
           output: "trivy-results.sarif"
-      
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v2
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
-      
+
       - name: npm audit - Backend
         working-directory: backend
         run: |
@@ -66,7 +66,7 @@ jobs:
             cat audit-backend.json | jq '.metadata' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
-      
+
       - name: npm audit - Frontend
         working-directory: frontend
         run: |
@@ -82,20 +82,20 @@ jobs:
   # ===========================================================================
   # Dependency Updates Check
   # ===========================================================================
-  
+
   dependency-check:
     name: Dependency Updates
     runs-on: ubuntu-latest
     if: github.event.schedule == '0 3 * * 1' || github.event.inputs.task == 'dependency-check'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Check Backend Dependencies
         working-directory: backend
         run: |
@@ -104,7 +104,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           npm outdated >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
-      
+
       - name: Check Frontend Dependencies
         working-directory: frontend
         run: |
@@ -113,7 +113,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           npm outdated >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
-      
+
       - name: Check Infrastructure Dependencies
         working-directory: infrastructure/cdk
         run: |
@@ -126,12 +126,12 @@ jobs:
   # ===========================================================================
   # Artifact Cleanup
   # ===========================================================================
-  
+
   cleanup-artifacts:
     name: Cleanup Old Artifacts
     runs-on: ubuntu-latest
     if: github.event.inputs.task == 'cleanup-artifacts'
-    
+
     steps:
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
@@ -144,12 +144,12 @@ jobs:
   # ===========================================================================
   # Database Backup Verification
   # ===========================================================================
-  
+
   database-backup-check:
     name: Database Backup Check
     runs-on: ubuntu-latest
     if: github.event.inputs.task == 'database-backup-check'
-    
+
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -157,19 +157,19 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Check RDS Backups
         run: |
           echo "## RDS Backup Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Get latest automated backup
           LATEST_BACKUP=$(aws rds describe-db-snapshots \
             --db-instance-identifier icitysystems \
             --snapshot-type automated \
             --query 'DBSnapshots | sort_by(@, &SnapshotCreateTime) | [-1]' \
             --output json 2>/dev/null || echo "{}")
-          
+
           if [ "$LATEST_BACKUP" != "{}" ]; then
             BACKUP_TIME=$(echo $LATEST_BACKUP | jq -r '.SnapshotCreateTime')
             BACKUP_STATUS=$(echo $LATEST_BACKUP | jq -r '.Status')
@@ -182,13 +182,13 @@ jobs:
   # ===========================================================================
   # Summary Report
   # ===========================================================================
-  
+
   maintenance-summary:
     name: Maintenance Summary
     runs-on: ubuntu-latest
     needs: [security-scan, dependency-check]
     if: always() && (github.event.schedule == '0 2 * * *' || github.event.schedule == '0 3 * * 1')
-    
+
     steps:
       - name: Generate Summary
         run: |

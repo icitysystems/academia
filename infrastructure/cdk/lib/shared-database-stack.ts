@@ -1,49 +1,88 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as rds from "aws-cdk-lib/aws-rds";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
 /**
  * Shared Database Stack
  *
- * Aurora PostgreSQL Serverless v2 cluster for production.
+ * References existing RDS PostgreSQL db.t3.micro instance (icitysystems)
+ * with database 'academia'.
  *
- * NOTE: The construct IDs must match the deployed CloudFormation stack.
- * Do NOT change construct IDs without migrating the deployed resources.
+ * Existing RDS Instance Specifications:
+ * - Instance: icitysystems (db.t3.micro)
+ * - Engine: PostgreSQL 15.x
+ * - Storage: 20 GB gp2 SSD
+ * - Database: academia
+ * - Multi-AZ: No
+ * - Public Access: No (VPC only)
+ * - Region: us-east-1
  *
- * Database: academia
+ * This stack creates VPC infrastructure and references the existing
+ * database credentials in Secrets Manager.
  */
 export interface SharedDatabaseStackProps extends cdk.StackProps {
 	vpcCidr?: string;
+	/**
+	 * Existing RDS instance endpoint (without port)
+	 * Default: icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com
+	 */
+	rdsEndpoint?: string;
+	/**
+	 * RDS port
+	 * Default: 5432
+	 */
+	rdsPort?: string;
+	/**
+	 * ARN of existing Secrets Manager secret with database credentials
+	 * The secret should contain: { "username": "...", "password": "..." }
+	 */
+	existingSecretArn?: string;
 }
 
 export class SharedDatabaseStack extends cdk.Stack {
 	public readonly vpc: ec2.IVpc;
-	public readonly cluster: rds.IDatabaseCluster;
 	public readonly dbSecurityGroup: ec2.ISecurityGroup;
 	public readonly dbSecret: secretsmanager.ISecret;
 
-	// Alias properties for compatibility with AcademiaAppStack
+	// Database connection properties
 	public readonly dbEndpoint: string;
 	public readonly dbPort: string;
 	public readonly dbSecretArn: string;
 	public readonly dbSecurityGroupId: string;
 
-	// Legacy alias for backward compatibility
-	public readonly dbInstance: rds.IDatabaseCluster;
+	// Database specifications (for documentation and cost estimation)
+	public static readonly RDS_SPECIFICATIONS = {
+		instanceIdentifier: "icitysystems",
+		instanceClass: "db.t3.micro",
+		engine: "postgres",
+		engineVersion: "15",
+		storageType: "gp2",
+		allocatedStorage: 20,
+		maxAllocatedStorage: 100,
+		multiAZ: false,
+		publiclyAccessible: false,
+		databaseName: "academia",
+		port: 5432,
+	};
 
 	constructor(scope: Construct, id: string, props?: SharedDatabaseStackProps) {
 		super(scope, id, props);
 
+		// RDS Instance endpoint (existing icitysystems instance)
+		const rdsEndpoint =
+			props?.rdsEndpoint ||
+			"icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com";
+		const rdsPort = props?.rdsPort || "5432";
+
 		// ========================================================================
-		// VPC for Database (shared across all environments)
+		// VPC for Lambda Functions (to connect to RDS)
 		// NOTE: Construct ID "SharedVpc" matches deployed stack
 		// ========================================================================
 		this.vpc = new ec2.Vpc(this, "SharedVpc", {
 			vpcName: "academia-shared-vpc",
 			maxAzs: 2,
-			natGateways: 0,
+			natGateways: 0, // No NAT gateways to reduce cost
 			subnetConfiguration: [
 				{
 					name: "Public",
@@ -58,73 +97,64 @@ export class SharedDatabaseStack extends cdk.Stack {
 			],
 		});
 
-		// VPC Endpoints for AWS services
+		// VPC Endpoints for AWS services (to allow Lambda in isolated subnets)
 		this.vpc.addInterfaceEndpoint("SecretsManagerEndpoint", {
 			service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
 		});
 
 		// ========================================================================
-		// Security Group for RDS PostgreSQL
+		// Security Group for accessing RDS
 		// NOTE: Construct ID "DbSecurityGroup" matches deployed stack
 		// ========================================================================
 		this.dbSecurityGroup = new ec2.SecurityGroup(this, "DbSecurityGroup", {
 			vpc: this.vpc,
-			description: "Academia RDS PostgreSQL security group",
-			allowAllOutbound: false,
+			description: "Academia RDS PostgreSQL access security group",
+			allowAllOutbound: true,
 		});
 
-		// Allow inbound from anywhere in VPC (Lambda functions)
-		this.dbSecurityGroup.addIngressRule(
-			ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
+		// Allow outbound to RDS port (for Lambda to connect to existing RDS)
+		this.dbSecurityGroup.addEgressRule(
+			ec2.Peer.anyIpv4(),
 			ec2.Port.tcp(5432),
-			"Allow PostgreSQL from VPC",
+			"Allow PostgreSQL outbound to RDS",
 		);
 
 		// ========================================================================
 		// Database Credentials
 		// NOTE: Construct ID "DbSecret" matches deployed stack
+		// Reference existing secret or create new one for the icitysystems RDS
 		// ========================================================================
-		this.dbSecret = new secretsmanager.Secret(this, "DbSecret", {
-			secretName: "academia/shared/database/credentials",
-			description: "Academia shared database credentials",
-			generateSecretString: {
-				secretStringTemplate: JSON.stringify({ username: "academia_admin" }),
-				generateStringKey: "password",
-				excludePunctuation: true,
-				passwordLength: 32,
-			},
-		});
+		if (props?.existingSecretArn) {
+			// Use existing secret
+			this.dbSecret = secretsmanager.Secret.fromSecretCompleteArn(
+				this,
+				"DbSecret",
+				props.existingSecretArn,
+			);
+		} else {
+			// Create new secret (credentials should be manually set to match existing RDS)
+			this.dbSecret = new secretsmanager.Secret(this, "DbSecret", {
+				secretName: "academia/shared/database/credentials",
+				description:
+					"Academia database credentials for icitysystems RDS instance",
+				generateSecretString: {
+					secretStringTemplate: JSON.stringify({
+						username: "academia_admin",
+						host: rdsEndpoint,
+						port: parseInt(rdsPort),
+						dbname: "academia",
+						engine: "postgres",
+					}),
+					generateStringKey: "password",
+					excludePunctuation: true,
+					passwordLength: 32,
+				},
+			});
+		}
 
-		// ========================================================================
-		// Aurora PostgreSQL Serverless v2 Cluster
-		// NOTE: Construct ID "SharedAuroraCluster" matches deployed stack
-		// ========================================================================
-		const cluster = new rds.DatabaseCluster(this, "SharedAuroraCluster", {
-			engine: rds.DatabaseClusterEngine.auroraPostgres({
-				version: rds.AuroraPostgresEngineVersion.VER_16_4,
-			}),
-			credentials: rds.Credentials.fromSecret(this.dbSecret),
-			defaultDatabaseName: "academia",
-			serverlessV2MinCapacity: 0.5,
-			serverlessV2MaxCapacity: 2,
-			writer: rds.ClusterInstance.serverlessV2("writer"),
-			vpc: this.vpc,
-			vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-			securityGroups: [this.dbSecurityGroup],
-			storageEncrypted: true,
-			backup: {
-				retention: cdk.Duration.days(7),
-			},
-			deletionProtection: true,
-			removalPolicy: cdk.RemovalPolicy.RETAIN,
-		});
-
-		this.cluster = cluster;
-		this.dbInstance = cluster; // Legacy alias
-
-		// Alias properties for compatibility with AcademiaAppStack
-		this.dbEndpoint = cluster.clusterEndpoint.hostname;
-		this.dbPort = cluster.clusterEndpoint.port.toString();
+		// Set connection properties
+		this.dbEndpoint = rdsEndpoint;
+		this.dbPort = rdsPort;
 		this.dbSecretArn = this.dbSecret.secretArn;
 		this.dbSecurityGroupId = this.dbSecurityGroup.securityGroupId;
 
@@ -137,15 +167,15 @@ export class SharedDatabaseStack extends cdk.Stack {
 			exportName: "academia-shared-vpc-id",
 		});
 
-		new cdk.CfnOutput(this, "ClusterEndpoint", {
+		new cdk.CfnOutput(this, "DbEndpoint", {
 			value: this.dbEndpoint,
-			description: "Aurora cluster endpoint",
+			description: "RDS PostgreSQL endpoint (icitysystems)",
 			exportName: "academia-shared-db-endpoint",
 		});
 
-		new cdk.CfnOutput(this, "ClusterPort", {
+		new cdk.CfnOutput(this, "DbPort", {
 			value: this.dbPort,
-			description: "Aurora cluster port",
+			description: "RDS PostgreSQL port",
 			exportName: "academia-shared-db-port",
 		});
 
@@ -157,8 +187,13 @@ export class SharedDatabaseStack extends cdk.Stack {
 
 		new cdk.CfnOutput(this, "DbSecurityGroupId", {
 			value: this.dbSecurityGroup.securityGroupId,
-			description: "Database security group ID",
+			description: "Database access security group ID",
 			exportName: "academia-shared-db-sg-id",
+		});
+
+		new cdk.CfnOutput(this, "RdsSpecifications", {
+			value: JSON.stringify(SharedDatabaseStack.RDS_SPECIFICATIONS, null, 2),
+			description: "RDS instance specifications",
 		});
 	}
 }

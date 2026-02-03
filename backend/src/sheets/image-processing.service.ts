@@ -2,7 +2,30 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { StorageService } from "../storage/storage.service";
 import * as sharp from "sharp";
-import { createWorker, Worker } from "tesseract.js";
+
+// Dynamic import for Tesseract.js - makes it optional for Lambda deployment
+// Tesseract.js is removed from the Lambda bundle to reduce package size
+interface TesseractWorker {
+	recognize: (
+		image: Buffer,
+		options?: Record<string, any>,
+	) => Promise<{ data: { text: string; confidence: number; words?: any[] } }>;
+	terminate: () => Promise<any>;
+}
+let tesseractModule: typeof import("tesseract.js") | null = null;
+let tesseractLoadError: string | null = null;
+
+async function loadTesseract(): Promise<boolean> {
+	if (tesseractModule !== null) return true;
+	if (tesseractLoadError !== null) return false;
+	try {
+		tesseractModule = await import("tesseract.js");
+		return true;
+	} catch (error) {
+		tesseractLoadError = error instanceof Error ? error.message : String(error);
+		return false;
+	}
+}
 
 export interface ProcessingResult {
 	processedUrl: string;
@@ -35,11 +58,20 @@ export interface PreprocessingOptions {
 	targetDPI?: number;
 }
 
+/**
+ * Image Processing Service
+ *
+ * NOTE: Tesseract.js is loaded dynamically to support Lambda deployments
+ * where the package may be removed to reduce bundle size. When Tesseract
+ * is not available, OCR returns placeholder text with low confidence.
+ */
 @Injectable()
 export class ImageProcessingService {
 	private readonly logger = new Logger(ImageProcessingService.name);
-	private ocrWorker: Worker | null = null;
+	private ocrWorker: TesseractWorker | null = null;
 	private readonly ocrLanguage: string;
+	private tesseractAvailable = false;
+	private tesseractInitialized = false;
 
 	constructor(
 		private storageService: StorageService,
@@ -49,15 +81,46 @@ export class ImageProcessingService {
 	}
 
 	/**
-	 * Initialize OCR worker (lazy loading)
+	 * Check if Tesseract OCR is available
 	 */
-	private async getOCRWorker(): Promise<Worker> {
-		if (!this.ocrWorker) {
-			this.logger.log("Initializing Tesseract OCR worker...");
-			this.ocrWorker = await createWorker(this.ocrLanguage);
-			this.logger.log("OCR worker initialized");
+	isTesseractAvailable(): boolean {
+		return this.tesseractAvailable;
+	}
+
+	/**
+	 * Initialize OCR worker (lazy loading)
+	 * Returns null if Tesseract is not available
+	 */
+	private async getOCRWorker(): Promise<TesseractWorker | null> {
+		if (this.ocrWorker) return this.ocrWorker;
+
+		// Only try once to load tesseract
+		if (this.tesseractInitialized) {
+			return null;
 		}
-		return this.ocrWorker;
+		this.tesseractInitialized = true;
+
+		const loaded = await loadTesseract();
+		if (!loaded || !tesseractModule) {
+			this.logger.warn(
+				`Tesseract.js not available: ${tesseractLoadError || "Unknown error"}`,
+			);
+			this.logger.warn("OCR will return placeholder results");
+			return null;
+		}
+
+		try {
+			this.logger.log("Initializing Tesseract OCR worker...");
+			this.ocrWorker = (await tesseractModule.createWorker(
+				this.ocrLanguage,
+			)) as unknown as TesseractWorker;
+			this.tesseractAvailable = true;
+			this.logger.log("OCR worker initialized");
+			return this.ocrWorker;
+		} catch (error) {
+			this.logger.error("Failed to create Tesseract worker:", error);
+			return null;
+		}
 	}
 
 	/**
@@ -232,9 +295,19 @@ export class ImageProcessingService {
 
 	/**
 	 * Run OCR on an image buffer
+	 * Returns placeholder result if Tesseract is not available
 	 */
 	async runOCR(buffer: Buffer): Promise<{ text: string; confidence: number }> {
 		const worker = await this.getOCRWorker();
+
+		if (!worker) {
+			// Tesseract not available - return placeholder
+			this.logger.warn("OCR not available - returning placeholder result");
+			return {
+				text: "[OCR_UNAVAILABLE]",
+				confidence: 0.0,
+			};
+		}
 
 		const { data } = await worker.recognize(buffer);
 

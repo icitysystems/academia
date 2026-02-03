@@ -28,51 +28,51 @@ jobs:
   # ===========================================================================
   # Create Release
   # ===========================================================================
-  
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
       tag: ${{ steps.version.outputs.tag }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      
+
       - name: Get current version
         id: current
         run: |
           CURRENT_VERSION=$(cat backend/package.json | jq -r '.version')
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
-      
+
       - name: Calculate new version
         id: version
         run: |
           CURRENT="${{ steps.current.outputs.current_version }}"
           TYPE="${{ github.event.inputs.version_type }}"
           PRERELEASE="${{ github.event.inputs.prerelease }}"
-          
+
           # Parse current version
           IFS='.' read -ra VERSION_PARTS <<< "${CURRENT%-*}"
           MAJOR=${VERSION_PARTS[0]}
           MINOR=${VERSION_PARTS[1]}
           PATCH=${VERSION_PARTS[2]}
-          
+
           # Calculate new version
           case $TYPE in
             major)
@@ -88,45 +88,45 @@ jobs:
               PATCH=$((PATCH + 1))
               ;;
           esac
-          
+
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          
+
           if [ -n "$PRERELEASE" ]; then
             NEW_VERSION="${NEW_VERSION}-${PRERELEASE}"
           fi
-          
+
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
-      
+
       - name: Update package.json versions
         run: |
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          
+
           # Update backend
           cd backend
           npm version $NEW_VERSION --no-git-tag-version
           cd ..
-          
+
           # Update frontend
           cd frontend
           npm version $NEW_VERSION --no-git-tag-version
           cd ..
-          
+
           # Update mobile
           cd mobile
           npm version $NEW_VERSION --no-git-tag-version
           cd ..
-      
+
       - name: Generate changelog
         id: changelog
         run: |
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
+
           echo "## What's Changed in v${NEW_VERSION}" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          
+
           if [ -n "$PREVIOUS_TAG" ]; then
             echo "### Commits since ${PREVIOUS_TAG}" >> RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
@@ -135,16 +135,16 @@ jobs:
             echo "### Initial Release" >> RELEASE_NOTES.md
             git log --pretty=format:"- %s (%h)" -20 >> RELEASE_NOTES.md
           fi
-          
+
           echo "" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
           echo "### Deployment" >> RELEASE_NOTES.md
           echo "- **Database:** academia (RDS PostgreSQL db.t3.micro - icitysystems)" >> RELEASE_NOTES.md
           echo "- **Backend:** AWS Lambda + API Gateway" >> RELEASE_NOTES.md
           echo "- **Frontend:** S3 + CloudFront" >> RELEASE_NOTES.md
-          
+
           cat RELEASE_NOTES.md
-      
+
       - name: Create release branch
         run: |
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
@@ -152,7 +152,7 @@ jobs:
           git add .
           git commit -m "chore: bump version to ${NEW_VERSION}"
           git push origin release/v${NEW_VERSION}
-      
+
       - name: Create Pull Request to main
         uses: peter-evans/create-pull-request@v5
         with:
@@ -162,7 +162,7 @@ jobs:
           title: "Release v${{ steps.version.outputs.new_version }}"
           body-path: RELEASE_NOTES.md
           labels: release
-      
+
       - name: Output summary
         run: |
           echo "## 🚀 Release Prepared" >> $GITHUB_STEP_SUMMARY
@@ -180,33 +180,33 @@ jobs:
   # ===========================================================================
   # Create GitHub Release (after tag is pushed)
   # ===========================================================================
-  
+
   publish-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Generate Release Notes
         id: notes
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${TAG}^ 2>/dev/null || echo "")
-          
+
           echo "## What's Changed" > notes.md
           echo "" >> notes.md
-          
+
           if [ -n "$PREVIOUS_TAG" ]; then
             git log ${PREVIOUS_TAG}..${TAG} --pretty=format:"- %s (%h)" >> notes.md
           else
             git log --pretty=format:"- %s (%h)" -20 >> notes.md
           fi
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

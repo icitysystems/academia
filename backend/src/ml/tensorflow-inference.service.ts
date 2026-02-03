@@ -1,7 +1,23 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import * as tf from "@tensorflow/tfjs";
 import { PrismaService } from "../prisma.service";
 import { StorageService } from "../storage/storage.service";
+
+// Dynamic import for TensorFlow.js - makes it optional for Lambda deployment
+// TensorFlow.js is removed from the Lambda bundle to reduce package size
+let tf: typeof import("@tensorflow/tfjs") | null = null;
+let tfLoadError: string | null = null;
+
+async function loadTensorFlow(): Promise<boolean> {
+	if (tf !== null) return true;
+	if (tfLoadError !== null) return false;
+	try {
+		tf = await import("@tensorflow/tfjs");
+		return true;
+	} catch (error) {
+		tfLoadError = error instanceof Error ? error.message : String(error);
+		return false;
+	}
+}
 
 export type Correctness = "CORRECT" | "PARTIAL" | "INCORRECT" | "SKIPPED";
 
@@ -43,13 +59,18 @@ interface ModelMetadata {
 /**
  * TensorFlow.js-based ML Inference Service
  * Provides real machine learning inference for automated grading
+ *
+ * NOTE: TensorFlow.js is loaded dynamically to support Lambda deployments
+ * where the package may be removed to reduce bundle size. When TensorFlow
+ * is not available, inference falls back to rule-based scoring.
  */
 @Injectable()
 export class TensorFlowInferenceService implements OnModuleInit {
 	private readonly logger = new Logger(TensorFlowInferenceService.name);
-	private models: Map<string, tf.LayersModel> = new Map();
+	private models: Map<string, any> = new Map(); // tf.LayersModel when tf is available
 	private modelMetadata: Map<string, ModelMetadata> = new Map();
 	private confidenceThreshold = 0.75;
+	private tfAvailable = false;
 
 	// Feature extraction settings
 	private readonly featureConfig: FeatureConfig = {
@@ -72,18 +93,34 @@ export class TensorFlowInferenceService implements OnModuleInit {
 	) {}
 
 	async onModuleInit() {
-		this.logger.log("TensorFlow.js ML Inference Service initialized");
-		this.logger.log(`TensorFlow.js version: ${tf.version.tfjs}`);
-		this.logger.log(`Backend: ${tf.getBackend()}`);
+		this.tfAvailable = await loadTensorFlow();
 
-		// Pre-warm TensorFlow
-		await this.warmUp();
+		if (this.tfAvailable && tf) {
+			this.logger.log("TensorFlow.js ML Inference Service initialized");
+			this.logger.log(`TensorFlow.js version: ${tf.version.tfjs}`);
+			this.logger.log(`Backend: ${tf.getBackend()}`);
+			// Pre-warm TensorFlow
+			await this.warmUp();
+		} else {
+			this.logger.warn(
+				`TensorFlow.js not available: ${tfLoadError || "Unknown error"}`,
+			);
+			this.logger.warn("ML inference will use rule-based fallback");
+		}
+	}
+
+	/**
+	 * Check if TensorFlow is available for ML inference
+	 */
+	isTensorFlowAvailable(): boolean {
+		return this.tfAvailable && tf !== null;
 	}
 
 	/**
 	 * Pre-warm TensorFlow to reduce cold-start latency
 	 */
 	private async warmUp() {
+		if (!tf) return;
 		const warmupTensor = tf.zeros([1, 100]);
 		warmupTensor.dispose();
 		this.logger.log("TensorFlow.js warmed up");
@@ -94,6 +131,14 @@ export class TensorFlowInferenceService implements OnModuleInit {
 	 */
 	async loadModel(modelId: string): Promise<boolean> {
 		try {
+			// If TensorFlow is not available, we'll use rule-based fallback
+			if (!this.tfAvailable || !tf) {
+				this.logger.warn(
+					`TensorFlow not available, model ${modelId} will use rule-based inference`,
+				);
+				return false;
+			}
+
 			const modelRecord = await this.prisma.mLModel.findUnique({
 				where: { id: modelId },
 			});
@@ -150,8 +195,11 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 	/**
 	 * Create a default neural network model for grading
+	 * Returns null if TensorFlow is not available
 	 */
-	private async createDefaultModel(): Promise<tf.LayersModel> {
+	private async createDefaultModel(): Promise<any | null> {
+		if (!tf) return null;
+
 		const model = tf.sequential({
 			layers: [
 				// Input layer - features extracted from text
@@ -190,6 +238,7 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 	/**
 	 * Run inference on a single answer region
+	 * Falls back to rule-based scoring when TensorFlow is not available
 	 */
 	async predict(
 		modelId: string,
@@ -198,11 +247,6 @@ export class TensorFlowInferenceService implements OnModuleInit {
 		expectedAnswer?: string,
 	): Promise<GradingPrediction> {
 		const startTime = Date.now();
-
-		// Ensure model is loaded
-		if (!this.models.has(modelId)) {
-			await this.loadModel(modelId);
-		}
 
 		const text = ocrData?.text || "";
 		const ocrConfidence = ocrData?.confidence || 0.5;
@@ -214,36 +258,50 @@ export class TensorFlowInferenceService implements OnModuleInit {
 			ocrData,
 			expectedAnswer,
 		);
-		const featureTensor = tf.tensor2d([features], [1, features.length]);
 
 		let predictedCorrectness: Correctness;
 		let confidence: number;
 		let explanation: string;
 
+		// Use TensorFlow if available, otherwise use rule-based inference
+		const useML = this.tfAvailable && tf !== null;
+
+		if (useML) {
+			// Ensure model is loaded
+			if (!this.models.has(modelId)) {
+				await this.loadModel(modelId);
+			}
+		}
+
 		try {
-			// Get the model
-			const model = this.models.get(modelId);
+			// Get the model (may be null if TF not available)
+			const model = useML ? this.models.get(modelId) : null;
 
-			if (model) {
+			if (model && tf) {
 				// Run TensorFlow inference
-				const prediction = model.predict(featureTensor) as tf.Tensor;
-				const probabilities = await prediction.data();
-				prediction.dispose();
+				const featureTensor = tf.tensor2d([features], [1, features.length]);
+				try {
+					const prediction = model.predict(featureTensor) as any;
+					const probabilities = await prediction.data();
+					prediction.dispose();
 
-				// Get predicted class and confidence
-				const maxIndex = Array.from(probabilities).indexOf(
-					Math.max(...probabilities),
-				);
-				confidence = probabilities[maxIndex];
-				predictedCorrectness = this.classLabels[maxIndex];
+					// Get predicted class and confidence
+					const maxIndex = Array.from(probabilities).indexOf(
+						Math.max(...probabilities),
+					);
+					confidence = probabilities[maxIndex];
+					predictedCorrectness = this.classLabels[maxIndex];
 
-				explanation = this.generateExplanation(
-					text,
-					region,
-					predictedCorrectness,
-					confidence,
-					features,
-				);
+					explanation = this.generateExplanation(
+						text,
+						region,
+						predictedCorrectness,
+						confidence,
+						features,
+					);
+				} finally {
+					featureTensor.dispose();
+				}
 			} else {
 				// Fallback to rule-based prediction
 				const ruleBasedResult = this.ruleBasedPrediction(
@@ -256,8 +314,18 @@ export class TensorFlowInferenceService implements OnModuleInit {
 				confidence = ruleBasedResult.confidence;
 				explanation = ruleBasedResult.explanation;
 			}
-		} finally {
-			featureTensor.dispose();
+		} catch (error) {
+			this.logger.error("Error during inference:", error);
+			// Fallback to rule-based on error
+			const ruleBasedResult = this.ruleBasedPrediction(
+				text,
+				region,
+				ocrData,
+				expectedAnswer,
+			);
+			predictedCorrectness = ruleBasedResult.correctness;
+			confidence = ruleBasedResult.confidence;
+			explanation = ruleBasedResult.explanation;
 		}
 
 		// Calculate score based on prediction
@@ -592,6 +660,7 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 	/**
 	 * Train a new model using annotated samples
+	 * Requires TensorFlow.js to be available
 	 */
 	async trainModel(
 		templateId: string,
@@ -603,7 +672,13 @@ export class TensorFlowInferenceService implements OnModuleInit {
 			expectedAnswer?: string;
 		}>,
 		config: { epochs: number; batchSize: number; validationSplit: number },
-	): Promise<{ model: tf.LayersModel; metrics: any }> {
+	): Promise<{ model: any; metrics: any }> {
+		if (!this.tfAvailable || !tf) {
+			throw new Error(
+				"TensorFlow.js is not available. Model training requires TensorFlow.js.",
+			);
+		}
+
 		this.logger.log(
 			`Training model for template ${templateId} with ${trainingData.length} samples`,
 		);
@@ -634,6 +709,11 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 		// Create model
 		const model = await this.createDefaultModel();
+		if (!model) {
+			xTrain.dispose();
+			yTrain.dispose();
+			throw new Error("Failed to create TensorFlow model");
+		}
 
 		// Train model
 		const history = await model.fit(xTrain, yTrain, {
@@ -675,12 +755,19 @@ export class TensorFlowInferenceService implements OnModuleInit {
 
 	/**
 	 * Save trained model to storage
+	 * Requires TensorFlow.js to be available
 	 */
 	async saveModel(
-		model: tf.LayersModel,
+		model: any,
 		modelId: string,
 		templateId: string,
 	): Promise<string> {
+		if (!this.tfAvailable || !tf) {
+			throw new Error(
+				"TensorFlow.js is not available. Model saving requires TensorFlow.js.",
+			);
+		}
+
 		const modelDir = `models/${templateId}/${modelId}`;
 
 		// Save model to file system (in production, would save to S3)
