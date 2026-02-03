@@ -765,7 +765,6 @@ jobs:
       needs.deploy.result == 'success' &&
       needs.determine-environment.outputs.run-performance == 'true'
     continue-on-error: true
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -789,12 +788,21 @@ jobs:
           ENV="${{ needs.determine-environment.outputs.environment }}"
 
           case $ENV in
-            testing) BASE_URL="https://test.academia.icitysystems.org" ;;
-            staging) BASE_URL="https://staging.academia.icitysystems.org" ;;
-            production) BASE_URL="https://academia.icitysystems.org" ;;
+            testing)
+              BASE_URL="https://test.academia.icitysystems.org"
+              API_URL="https://api.test.academia.icitysystems.org"
+              ;;
+            staging)
+              BASE_URL="https://staging.academia.icitysystems.org"
+              API_URL="https://api.staging.academia.icitysystems.org"
+              ;;
+            production)
+              BASE_URL="https://academia.icitysystems.org"
+              API_URL="https://api.academia.icitysystems.org"
+              ;;
           esac
 
-          k6 run --env BASE_URL=$BASE_URL load-test.js
+          k6 run --env BASE_URL=$BASE_URL --env API_URL=$API_URL load-test.js
 
       - name: Upload performance results
         uses: actions/upload-artifact@v4
@@ -816,7 +824,6 @@ jobs:
       always() &&
       needs.deploy.result == 'success'
     continue-on-error: true
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -876,7 +883,14 @@ jobs:
   notify:
     name: Notify
     runs-on: ubuntu-latest
-    needs: [determine-environment, deploy, smoke-tests, performance-tests, production-approval]
+    needs:
+      [
+        determine-environment,
+        deploy,
+        smoke-tests,
+        performance-tests,
+        production-approval,
+      ]
     if: always()
 
     steps:
