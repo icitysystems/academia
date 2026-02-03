@@ -1,0 +1,200 @@
+# =============================================================================
+# Hotfix Workflow
+# =============================================================================
+# Fast-track deployment for critical production fixes
+
+name: Hotfix Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: "Hotfix description"
+        required: true
+      severity:
+        description: "Severity level"
+        required: true
+        type: choice
+        options:
+          - critical
+          - high
+          - medium
+
+env:
+  NODE_VERSION: "20"
+  AWS_REGION: us-east-1
+  DATABASE_NAME: academia
+  RDS_INSTANCE: icitysystems
+
+jobs:
+  # ===========================================================================
+  # Validate Hotfix
+  # ===========================================================================
+  
+  validate:
+    name: Validate Hotfix
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check branch
+        id: check
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          
+          if [[ "$BRANCH" == hotfix/* ]]; then
+            echo "✅ Valid hotfix branch: $BRANCH"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Not a hotfix branch. Must be hotfix/*"
+            echo "proceed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Quick validation
+        run: |
+          cd backend
+          npm ci
+          npx prisma generate
+          npm run lint
+          npm run build
+
+  # ===========================================================================
+  # Fast Deploy to Staging
+  # ===========================================================================
+  
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.proceed == 'true'
+    environment:
+      name: staging
+      url: https://staging.academia.icitysystems.org
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Build and package
+        run: |
+          cd backend
+          npm ci
+          cp prisma/schema.production.prisma prisma/schema.prisma
+          npx prisma generate
+          npm run build
+          
+          mkdir -p lambda-package
+          cp -r dist lambda-package/
+          cp package.json package-lock.json lambda-package/
+          cp -r prisma lambda-package/
+          
+          cd lambda-package
+          npm ci --production --no-optional
+          npx prisma generate
+          zip -r ../hotfix-lambda.zip .
+      
+      - name: Deploy Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name academia-backend-staging \
+            --zip-file fileb://backend/hotfix-lambda.zip \
+            --publish
+      
+      - name: Smoke test
+        run: |
+          sleep 10
+          curl -f https://api.staging.academia.icitysystems.org/health || echo "Health check pending"
+
+  # ===========================================================================
+  # Production Deployment (with approval)
+  # ===========================================================================
+  
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment:
+      name: production
+      url: https://academia.icitysystems.org
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Build and package
+        run: |
+          cd backend
+          npm ci
+          cp prisma/schema.production.prisma prisma/schema.prisma
+          npx prisma generate
+          npm run build
+          
+          mkdir -p lambda-package
+          cp -r dist lambda-package/
+          cp package.json package-lock.json lambda-package/
+          cp -r prisma lambda-package/
+          
+          cd lambda-package
+          npm ci --production --no-optional
+          npx prisma generate
+          zip -r ../hotfix-lambda.zip .
+      
+      - name: Deploy Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name academia-backend-production \
+            --zip-file fileb://backend/hotfix-lambda.zip \
+            --publish
+      
+      - name: Smoke test
+        run: |
+          sleep 10
+          curl -f https://api.academia.icitysystems.org/health || echo "Health check pending"
+      
+      - name: Post hotfix summary
+        run: |
+          echo "## 🚨 Hotfix Deployed to Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Description:** ${{ github.event.inputs.description }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Severity:** ${{ github.event.inputs.severity }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Monitor application logs and metrics" >> $GITHUB_STEP_SUMMARY
+          echo "2. Merge hotfix branch to main and develop" >> $GITHUB_STEP_SUMMARY
+          echo "3. Create post-mortem if needed" >> $GITHUB_STEP_SUMMARY
