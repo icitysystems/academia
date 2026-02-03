@@ -512,16 +512,16 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           FUNCTION_NAME="academia-backend-${ENV}"
-          
+
           # Get the assets bucket from the backend stack
           ASSETS_BUCKET=$(aws cloudformation describe-stacks \
             --stack-name "AcademiaBackend-$(echo ${ENV:0:1} | tr '[:lower:]' '[:upper:]')${ENV:1}" \
             --query 'Stacks[0].Outputs[?OutputKey==`AssetsBucketName`].OutputValue' \
             --output text 2>/dev/null || echo "")
-          
+
           # If no assets bucket found, use default naming convention
           if [ -z "$ASSETS_BUCKET" ] || [ "$ASSETS_BUCKET" = "None" ]; then
-            ASSETS_BUCKET="academia-backend-assets-${ENV}"
+            ASSETS_BUCKET="academia-assets-staging-${{ secrets.AWS_ACCOUNT_ID }}"
           fi
           
           echo "Using S3 bucket: $ASSETS_BUCKET"
@@ -532,53 +532,42 @@ jobs:
           unzip -o backend-lambda.zip -d lambda-extracted
           cd lambda-extracted
 
-          # Install production dependencies on AWS (not from dev node_modules)
+          # Install production dependencies with minimal footprint
           echo "Installing production dependencies..."
-          npm ci --production --ignore-scripts
+          npm ci --production --ignore-scripts --no-optional
+          
+          # Clean up unnecessary files to reduce bundle size
+          echo "Cleaning up unnecessary files..."
+          find node_modules -type f \( -name "*.md" -o -name "*.ts" -o -name "*.map" -o -name "LICENSE*" -o -name "CHANGELOG*" -o -name "README*" -o -name "*.d.ts" -o -name ".npmignore" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*" \) -delete 2>/dev/null || true
+          find node_modules -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "__tests__" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
+          rm -rf node_modules/.package-lock.json node_modules/.cache 2>/dev/null || true
 
           # Generate Prisma client for production
           npx prisma generate
 
           # Repackage with production node_modules
-          zip -r ../lambda-production.zip .
+          zip -r -q ../lambda-production.zip .
           cd ..
           
           # Get zip file size
-          ZIPSIZE=$(stat -f%z lambda-production.zip 2>/dev/null || stat -c%s lambda-production.zip)
-          echo "Lambda package size: $ZIPSIZE bytes"
+          ZIPSIZE=$(stat -c%s lambda-production.zip 2>/dev/null || stat -f%z lambda-production.zip)
+          echo "Lambda package size: $ZIPSIZE bytes ($(($ZIPSIZE / 1024 / 1024)) MB)"
           
-          # If larger than 50MB, upload to S3 first
-          if [ "$ZIPSIZE" -gt 50000000 ]; then
-            echo "Package too large for direct upload, using S3..."
-            S3_KEY="lambda/backend-${ENV}-$(date +%s).zip"
-            aws s3 cp lambda-production.zip "s3://${ASSETS_BUCKET}/${S3_KEY}"
-            
-            # Update Lambda function code from S3
-            aws lambda update-function-code \
-              --function-name $FUNCTION_NAME \
-              --s3-bucket "$ASSETS_BUCKET" \
-              --s3-key "$S3_KEY" \
-              --publish
-          else
-            # Update Lambda function code directly
-            aws lambda update-function-code \
-              --function-name $FUNCTION_NAME \
-              --zip-file fileb://lambda-production.zip \
-              --publish
-          fi
-
-      - name: Configure production secrets in AWS Secrets Manager
-        run: |
-          ENV="${{ needs.determine-environment.outputs.environment }}"
-
-          # Get database credentials from Secrets Manager
-          DB_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id "academia/shared/database/credentials" \
-            --query 'SecretString' --output text 2>/dev/null || echo "{}")
-
-          if [ "$DB_SECRET" != "{}" ]; then
-            DB_USER=$(echo $DB_SECRET | jq -r '.username // "academia_admin"')
-            DB_PASS=$(echo $DB_SECRET | jq -r '.password // empty')
+          # Upload to S3 and deploy
+          echo "Uploading to S3..."
+          S3_KEY="lambda/backend-${ENV}-$(date +%s).zip"
+          aws s3 cp lambda-production.zip "s3://${ASSETS_BUCKET}/${S3_KEY}"
+          
+          # Update Lambda function code from S3
+          aws lambda update-function-code \
+            --function-name $FUNCTION_NAME \
+            --s3-bucket "$ASSETS_BUCKET" \
+            --s3-key "$S3_KEY" \
+            --publish
             
             # Get RDS endpoint
             DB_ENDPOINT=$(aws rds describe-db-instances \
