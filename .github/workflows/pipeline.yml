@@ -485,7 +485,7 @@ jobs:
 
           # Check if shared database stack exists and is stable
           SHARED_DB_STATUS=$(aws cloudformation describe-stacks --stack-name AcademiaSharedDatabase --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
-          
+
           if [ "$SHARED_DB_STATUS" = "NOT_FOUND" ] || [ "$SHARED_DB_STATUS" = "ROLLBACK_COMPLETE" ]; then
             echo "Shared database stack needs to be created..."
             npx cdk deploy AcademiaSharedDatabase \
