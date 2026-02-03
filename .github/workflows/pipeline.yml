@@ -512,8 +512,22 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           FUNCTION_NAME="academia-backend-${ENV}"
+          
+          # Get the assets bucket from the backend stack
+          ASSETS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name "AcademiaBackend-$(echo ${ENV:0:1} | tr '[:lower:]' '[:upper:]')${ENV:1}" \
+            --query 'Stacks[0].Outputs[?OutputKey==`AssetsBucketName`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          # If no assets bucket found, use default naming convention
+          if [ -z "$ASSETS_BUCKET" ] || [ "$ASSETS_BUCKET" = "None" ]; then
+            ASSETS_BUCKET="academia-backend-assets-${ENV}"
+          fi
+          
+          echo "Using S3 bucket: $ASSETS_BUCKET"
 
           # Extract artifact
+          mkdir -p artifacts
           cd artifacts
           unzip -o backend-lambda.zip -d lambda-extracted
           cd lambda-extracted
@@ -528,12 +542,30 @@ jobs:
           # Repackage with production node_modules
           zip -r ../lambda-production.zip .
           cd ..
-
-          # Update Lambda function code
-          aws lambda update-function-code \
-            --function-name $FUNCTION_NAME \
-            --zip-file fileb://lambda-production.zip \
-            --publish
+          
+          # Get zip file size
+          ZIPSIZE=$(stat -f%z lambda-production.zip 2>/dev/null || stat -c%s lambda-production.zip)
+          echo "Lambda package size: $ZIPSIZE bytes"
+          
+          # If larger than 50MB, upload to S3 first
+          if [ "$ZIPSIZE" -gt 50000000 ]; then
+            echo "Package too large for direct upload, using S3..."
+            S3_KEY="lambda/backend-${ENV}-$(date +%s).zip"
+            aws s3 cp lambda-production.zip "s3://${ASSETS_BUCKET}/${S3_KEY}"
+            
+            # Update Lambda function code from S3
+            aws lambda update-function-code \
+              --function-name $FUNCTION_NAME \
+              --s3-bucket "$ASSETS_BUCKET" \
+              --s3-key "$S3_KEY" \
+              --publish
+          else
+            # Update Lambda function code directly
+            aws lambda update-function-code \
+              --function-name $FUNCTION_NAME \
+              --zip-file fileb://lambda-production.zip \
+              --publish
+          fi
 
       - name: Configure production secrets in AWS Secrets Manager
         run: |
