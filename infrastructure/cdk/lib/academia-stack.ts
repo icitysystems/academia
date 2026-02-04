@@ -44,11 +44,14 @@ export class AcademiaBackendStack extends cdk.Stack {
 
 		const envConfig = props.environmentConfig;
 		const envName = envConfig.name;
-		const fullDomain = `${props.subdomain}.${props.domainName}`;
-		// API domain: use apiSubdomain if configured, otherwise default to api.{subdomain}
+		// Handle empty subdomain (production) - domain is already academia.icitysystems.org
+		const fullDomain = props.subdomain
+			? `${props.subdomain}.${props.domainName}`
+			: props.domainName;
+		// API domain: use apiSubdomain if configured, otherwise default to api.{domain}
 		const apiDomain = envConfig.apiSubdomain
 			? `${envConfig.apiSubdomain}.${props.domainName}`
-			: `api.${fullDomain}`;
+			: `api.${props.domainName}`;
 
 		// ========================================================================
 		// VPC (Minimal - for Aurora Serverless)

@@ -27,7 +27,10 @@ export class AcademiaFrontendStack extends cdk.Stack {
 
 		const envConfig = props.environmentConfig;
 		const envName = envConfig?.name || "production";
-		const fullDomain = `${props.subdomain}.${props.domainName}`;
+		// Handle empty subdomain (production) - domain is already academia.icitysystems.org
+		const fullDomain = props.subdomain
+			? `${props.subdomain}.${props.domainName}`
+			: props.domainName;
 
 		// Hosted Zone - use ID if provided
 		let hostedZone: route53.IHostedZone | undefined;

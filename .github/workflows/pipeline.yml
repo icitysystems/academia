@@ -531,16 +531,16 @@ jobs:
           npx cdk deploy "AcademiaBackend-${ENV_CAPITALIZED}" \
             --context environment=$ENV \
             --context hostedZoneId=${{ secrets.HOSTED_ZONE_ID }} \
-            --context domainName=icitysystems.org \
+            --context domainName=academia.icitysystems.org \
             --require-approval never \
             --outputs-file backend-cdk-outputs.json
 
           echo "Backend deployment complete. Now deploying frontend..."
-          
+
           npx cdk deploy "AcademiaFrontend-${ENV_CAPITALIZED}" \
             --context environment=$ENV \
             --context hostedZoneId=${{ secrets.HOSTED_ZONE_ID }} \
-            --context domainName=icitysystems.org \
+            --context domainName=academia.icitysystems.org \
             --require-approval never \
             --outputs-file frontend-cdk-outputs.json
 

@@ -94,14 +94,16 @@ if (config.deployEnvironment && environmentsToDeploy.length === 0) {
 
 // Helper functions
 function getSubdomain(envName: string): string {
+	// Subdomain prefixes for different environments
+	// Production uses empty string since domainName is academia.icitysystems.org
 	const subdomains: Record<string, string> = {
 		dev1: "dev1",
 		dev2: "dev2",
 		testing: "test",
 		staging: "staging",
-		production: "app",
+		production: "", // No subdomain - domain is already academia.icitysystems.org
 	};
-	return subdomains[envName] || envName;
+	return subdomains[envName] ?? envName;
 }
 
 function capitalize(s: string): string {
