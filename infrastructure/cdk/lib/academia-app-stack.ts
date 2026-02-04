@@ -73,11 +73,11 @@ export class AcademiaAppStack extends cdk.Stack {
 			allowAllOutbound: true,
 		});
 
-		// Allow Lambda to connect to Aurora
+		// Allow Lambda to connect to RDS
 		dbSecurityGroup.addIngressRule(
 			lambdaSecurityGroup,
 			ec2.Port.tcp(5432),
-			`Allow Lambda ${envName} to Aurora`,
+			`Allow Lambda ${envName} to RDS`,
 		);
 
 		// ========================================================================

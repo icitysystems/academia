@@ -181,9 +181,8 @@ console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║           Estimated Monthly Cost (~1M requests)            ║
 ╠════════════════════════════════════════════════════════════╣
-║  Aurora db.t4g.micro (shared)     $29.20                   ║
-║  Aurora Storage (20GB)            $2.00                    ║
-║  Aurora I/O (1M requests)         $0.20                    ║
+║  RDS db.t3.micro (icitysystems)   $12.41                   ║
+║  RDS Storage (20GB gp2)           $2.30                    ║
 ║  Lambda (5 environments)          $8.35                    ║
 ║  API Gateway (1M requests)        $3.50                    ║
 ║  S3 Storage (5 × 5GB)             $0.58                    ║
@@ -191,7 +190,7 @@ console.log(`
 ║  Route53 (5 subdomains)           $0.90                    ║
 ║  Secrets Manager (8 secrets)      $1.60                    ║
 ╠════════════════════════════════════════════════════════════╣
-║  TOTAL ESTIMATED                  ~$51/month               ║
+║  TOTAL ESTIMATED                  ~$34/month               ║
 ╚════════════════════════════════════════════════════════════╝
 
 Deploy commands:
