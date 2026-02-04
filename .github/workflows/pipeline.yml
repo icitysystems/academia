@@ -489,9 +489,10 @@ jobs:
 
           echo "Backend stack status: $BACKEND_STATUS"
 
-          # If stacks exist and are stable (CREATE_COMPLETE or UPDATE_COMPLETE or UPDATE_ROLLBACK_COMPLETE),
+          # If stacks exist and are in successful state (CREATE_COMPLETE or UPDATE_COMPLETE),
           # skip CDK deployment and use existing infrastructure
-          if [[ "$BACKEND_STATUS" == "CREATE_COMPLETE" ]] || [[ "$BACKEND_STATUS" == "UPDATE_COMPLETE" ]] || [[ "$BACKEND_STATUS" == "UPDATE_ROLLBACK_COMPLETE" ]]; then
+          # Note: UPDATE_ROLLBACK_COMPLETE means a failed update - we should try CDK deploy to fix it
+          if [[ "$BACKEND_STATUS" == "CREATE_COMPLETE" ]] || [[ "$BACKEND_STATUS" == "UPDATE_COMPLETE" ]]; then
             echo "Backend stack already exists in stable state, skipping CDK deployment..."
             echo "Will update Lambda code and frontend directly."
             echo "cdk-deployed=false" >> $GITHUB_OUTPUT
@@ -503,6 +504,11 @@ jobs:
             API_URL=$(cat backend-outputs.json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue // empty')
             echo "api-url=$API_URL" >> $GITHUB_OUTPUT
             exit 0
+          fi
+
+          if [[ "$BACKEND_STATUS" == "UPDATE_ROLLBACK_COMPLETE" ]]; then
+            echo "⚠️ Backend stack is in UPDATE_ROLLBACK_COMPLETE state (previous update failed)"
+            echo "Will attempt CDK deploy to recover..."
           fi
 
           # Check if shared database stack exists and is stable
@@ -517,25 +523,37 @@ jobs:
             echo "Shared database stack already exists (status: $SHARED_DB_STATUS), skipping deployment..."
           fi
 
-          # Deploy environment-specific stacks
-          # Pass hostedZoneId as context and domainName for Route53/ACM setup
-          echo "Deploying backend and frontend for $ENV..."
-          npx cdk deploy "AcademiaBackend-${ENV_CAPITALIZED}" "AcademiaFrontend-${ENV_CAPITALIZED}" \
+          # Deploy environment-specific stacks SEQUENTIALLY (not in parallel)
+          # This avoids CloudFormation cross-stack export dependency issues
+          # The Frontend depends on Backend's API URL export, so Backend must be deployed first
+
+          echo "Deploying backend for $ENV..."
+          npx cdk deploy "AcademiaBackend-${ENV_CAPITALIZED}" \
             --context environment=$ENV \
             --context hostedZoneId=${{ secrets.HOSTED_ZONE_ID }} \
             --context domainName=icitysystems.org \
             --require-approval never \
-            --exclusively \
-            --outputs-file cdk-outputs.json
+            --outputs-file backend-cdk-outputs.json
+
+          echo "Backend deployment complete. Now deploying frontend..."
+          
+          npx cdk deploy "AcademiaFrontend-${ENV_CAPITALIZED}" \
+            --context environment=$ENV \
+            --context hostedZoneId=${{ secrets.HOSTED_ZONE_ID }} \
+            --context domainName=icitysystems.org \
+            --require-approval never \
+            --outputs-file frontend-cdk-outputs.json
 
           echo "cdk-deployed=true" >> $GITHUB_OUTPUT
 
-          # Extract outputs and show deployed URLs
-          echo "CDK Outputs:"
-          cat cdk-outputs.json
+          # Merge outputs for compatibility
+          echo "CDK Outputs (Backend):"
+          cat backend-cdk-outputs.json
+          echo "CDK Outputs (Frontend):"
+          cat frontend-cdk-outputs.json
 
           # Extract API URL for later use
-          API_URL=$(cat cdk-outputs.json | jq -r '."AcademiaBackend-'${ENV_CAPITALIZED}'".ApiUrl // empty')
+          API_URL=$(cat backend-cdk-outputs.json | jq -r '."AcademiaBackend-'${ENV_CAPITALIZED}'".ApiUrl // empty')
           echo "api-url=$API_URL" >> $GITHUB_OUTPUT
         env:
           HOSTED_ZONE_ID: ${{ secrets.HOSTED_ZONE_ID }}
