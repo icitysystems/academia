@@ -183,7 +183,7 @@ jobs:
       - name: Smoke test
         run: |
           sleep 10
-          curl -f https://api.academia.icitysystems.org/health || echo "Health check pending"
+          curl -f https://academia-api.icitysystems.org/health || echo "Health check pending"
 
       - name: Post hotfix summary
         run: |

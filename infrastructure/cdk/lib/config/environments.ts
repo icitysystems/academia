@@ -18,6 +18,7 @@ export interface EnvironmentConfig {
 	// Domain configuration
 	domainName: string;
 	subdomain: string;
+	apiSubdomain?: string; // Optional: defaults to api.{subdomain}
 	hostedZoneId?: string;
 
 	// Resource sizing
@@ -228,6 +229,7 @@ export const environments: Record<EnvironmentName, EnvironmentConfig> = {
 		awsRegion: "us-east-1",
 		domainName: "icitysystems.org",
 		subdomain: "academia",
+		apiSubdomain: "academia-api", // API at academia-api.icitysystems.org
 		hostedZoneId: process.env.HOSTED_ZONE_ID,
 
 		lambda: {
