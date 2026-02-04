@@ -476,12 +476,34 @@ jobs:
       - name: Deploy CDK Stack
         id: cdk-deploy
         working-directory: infrastructure/cdk
+        continue-on-error: true
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           echo "Deploying to environment: $ENV"
 
           # Capitalize first letter for stack name
           ENV_CAPITALIZED="$(echo ${ENV:0:1} | tr '[:lower:]' '[:upper:]')${ENV:1}"
+
+          # Check backend stack status
+          BACKEND_STATUS=$(aws cloudformation describe-stacks --stack-name "AcademiaBackend-${ENV_CAPITALIZED}" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "Backend stack status: $BACKEND_STATUS"
+
+          # If stacks exist and are stable (CREATE_COMPLETE or UPDATE_COMPLETE or UPDATE_ROLLBACK_COMPLETE),
+          # skip CDK deployment and use existing infrastructure
+          if [[ "$BACKEND_STATUS" == "CREATE_COMPLETE" ]] || [[ "$BACKEND_STATUS" == "UPDATE_COMPLETE" ]] || [[ "$BACKEND_STATUS" == "UPDATE_ROLLBACK_COMPLETE" ]]; then
+            echo "Backend stack already exists in stable state, skipping CDK deployment..."
+            echo "Will update Lambda code and frontend directly."
+            echo "cdk-deployed=false" >> $GITHUB_OUTPUT
+
+            # Get existing outputs from the stack
+            aws cloudformation describe-stacks --stack-name "AcademiaBackend-${ENV_CAPITALIZED}" \
+              --query 'Stacks[0].Outputs' --output json > backend-outputs.json
+
+            API_URL=$(cat backend-outputs.json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue // empty')
+            echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           # Check if shared database stack exists and is stable
           SHARED_DB_STATUS=$(aws cloudformation describe-stacks --stack-name AcademiaSharedDatabase --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
@@ -505,6 +527,8 @@ jobs:
             --require-approval never \
             --exclusively \
             --outputs-file cdk-outputs.json
+
+          echo "cdk-deployed=true" >> $GITHUB_OUTPUT
 
           # Extract outputs and show deployed URLs
           echo "CDK Outputs:"
