@@ -798,7 +798,7 @@ jobs:
               ;;
             production)
               BASE_URL="https://academia.icitysystems.org"
-              API_URL="https://academia-api.icitysystems.org"
+              API_URL="https://api.academia.icitysystems.org"
               ;;
           esac
 
@@ -845,12 +845,8 @@ jobs:
             production) BASE_URL="https://academia.icitysystems.org" ;;
           esac
 
-          # Set API URL based on environment (production uses different subdomain pattern)
-          if [ "$ENV" = "production" ]; then
-            API_URL="https://academia-api.icitysystems.org"
-          else
-            API_URL="https://api.${BASE_URL#https://}"
-          fi
+          # Set API URL based on environment
+          API_URL="https://api.${BASE_URL#https://}"
 
           echo "Testing frontend: $BASE_URL"
           curl -f -s -o /dev/null -w "%{http_code}" "$BASE_URL" | grep -q "200\|301\|302"
