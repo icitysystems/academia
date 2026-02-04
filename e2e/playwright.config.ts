@@ -76,19 +76,27 @@ export default defineConfig({
 		},
 	],
 
-	/* Run your local dev server before starting the tests */
-	webServer: [
-		{
-			command: "cd ../frontend && npm start",
-			url: "http://localhost:3000",
-			reuseExistingServer: !process.env.CI,
-			timeout: 120000,
-		},
-		{
-			command: "cd ../backend && npm run start:dev",
-			url: "http://localhost:3333/graphql",
-			reuseExistingServer: !process.env.CI,
-			timeout: 120000,
-		},
-	],
+	/**
+	 * Run your local dev server before starting the tests
+	 * Only enabled when testing locally (not against deployed environments)
+	 * The webServer is disabled if BASE_URL is set to a non-localhost URL
+	 */
+	...(process.env.BASE_URL && !process.env.BASE_URL.includes("localhost")
+		? {}
+		: {
+				webServer: [
+					{
+						command: "cd ../frontend && npm start",
+						url: "http://localhost:3000",
+						reuseExistingServer: !process.env.CI,
+						timeout: 120000,
+					},
+					{
+						command: "cd ../backend && npm run start:dev",
+						url: "http://localhost:3333/graphql",
+						reuseExistingServer: !process.env.CI,
+						timeout: 120000,
+					},
+				],
+			}),
 });
