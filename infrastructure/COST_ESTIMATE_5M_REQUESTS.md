@@ -12,21 +12,21 @@
 
 ## Cost Breakdown
 
-| Service                            | Details                                 |    Monthly Cost |
-| ---------------------------------- | --------------------------------------- | --------------: |
-| **RDS db.t3.micro**                | 1 instance (730 hrs × $0.017/hr)        |          $12.41 |
-| **RDS Storage**                    | 20GB gp2 @ $0.115/GB                    |           $2.30 |
-| **Lambda (5 environments)**        | 5M invocations, 512MB, 500ms avg        |          $21.84 |
-| **API Gateway**                    | 5M requests @ $3.50/million             |          $17.50 |
-| **S3 Storage**                     | 25GB across 5 buckets @ $0.023/GB       |           $0.58 |
-| **S3 Requests**                    | ~10M GET/PUT @ $0.005/1000              |           $0.05 |
-| **CloudFront Data Transfer**       | 250GB @ $0.085/GB                       |          $21.25 |
-| **CloudFront Requests**            | 5M @ $0.0075/10K                        |           $3.75 |
-| **Route53**                        | 5 hosted zones + 5M queries             |           $2.50 |
-| **Secrets Manager**                | 8 secrets @ $0.40/secret                |           $3.20 |
-| **Data Transfer (AWS → Internet)** | ~50GB @ $0.09/GB                        |           $4.50 |
-|                                    |                                         |                 |
-| **TOTAL**                          |                                         |  **~$90/month** |
+| Service                            | Details                           |   Monthly Cost |
+| ---------------------------------- | --------------------------------- | -------------: |
+| **RDS db.t3.micro**                | 1 instance (730 hrs × $0.017/hr)  |         $12.41 |
+| **RDS Storage**                    | 20GB gp2 @ $0.115/GB              |          $2.30 |
+| **Lambda (5 environments)**        | 5M invocations, 512MB, 500ms avg  |         $21.84 |
+| **API Gateway**                    | 5M requests @ $3.50/million       |         $17.50 |
+| **S3 Storage**                     | 25GB across 5 buckets @ $0.023/GB |          $0.58 |
+| **S3 Requests**                    | ~10M GET/PUT @ $0.005/1000        |          $0.05 |
+| **CloudFront Data Transfer**       | 250GB @ $0.085/GB                 |         $21.25 |
+| **CloudFront Requests**            | 5M @ $0.0075/10K                  |          $3.75 |
+| **Route53**                        | 5 hosted zones + 5M queries       |          $2.50 |
+| **Secrets Manager**                | 8 secrets @ $0.40/secret          |          $3.20 |
+| **Data Transfer (AWS → Internet)** | ~50GB @ $0.09/GB                  |          $4.50 |
+|                                    |                                   |                |
+| **TOTAL**                          |                                   | **~$90/month** |
 
 ---
 
@@ -81,12 +81,12 @@
 
 ## Comparison: Architecture Options
 
-| Architecture                  | 5M Requests/month | Notes                |
-| ----------------------------- | ----------------: | -------------------- |
-| **RDS db.t3.micro (shared)**  |              ~$90 | ✅ Current setup     |
-| Aurora db.t4g.micro (shared)  |             ~$109 | More expensive       |
-| Separate db.t3.micro (×5)     |             ~$152 | 5× database cost     |
-| Aurora Serverless v2 (×5)     |            ~$375+ | Variable, can spike  |
+| Architecture                 | 5M Requests/month | Notes               |
+| ---------------------------- | ----------------: | ------------------- |
+| **RDS db.t3.micro (shared)** |              ~$90 | ✅ Current setup    |
+| Aurora db.t4g.micro (shared) |             ~$109 | More expensive      |
+| Separate db.t3.micro (×5)    |             ~$152 | 5× database cost    |
+| Aurora Serverless v2 (×5)    |            ~$375+ | Variable, can spike |
 
 ### Savings with RDS db.t3.micro
 
@@ -107,12 +107,12 @@
 
 ### Upgrade Path (if needed)
 
-| Instance      | vCPU | RAM  | Cost/month | When to Consider |
-| ------------- | ---- | ---- | ---------- | ---------------- |
-| db.t3.micro   | 2    | 1 GB | $12.41     | < 10M requests   |
-| db.t3.small   | 2    | 2 GB | $24.82     | 10-25M requests  |
-| db.t3.medium  | 2    | 4 GB | $49.64     | 25-50M requests  |
-| db.t3.large   | 2    | 8 GB | $99.28     | 50-100M requests |
+| Instance     | vCPU | RAM  | Cost/month | When to Consider |
+| ------------ | ---- | ---- | ---------- | ---------------- |
+| db.t3.micro  | 2    | 1 GB | $12.41     | < 10M requests   |
+| db.t3.small  | 2    | 2 GB | $24.82     | 10-25M requests  |
+| db.t3.medium | 2    | 4 GB | $49.64     | 25-50M requests  |
+| db.t3.large  | 2    | 8 GB | $99.28     | 50-100M requests |
 
 ---
 

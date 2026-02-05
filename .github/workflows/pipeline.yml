@@ -848,7 +848,7 @@ jobs:
               ;;
             production)
               BASE_URL="https://academia.icitysystems.org"
-              API_URL="https://api.academia.icitysystems.org"
+              API_URL="https://academia.icitysystems.org/api"
               ;;
           esac
 
@@ -900,8 +900,12 @@ jobs:
             production) BASE_URL="https://academia.icitysystems.org" ;;
           esac
 
-          # Set API URL based on environment
-          API_URL="https://api.${BASE_URL#https://}"
+          # Set API URL based on environment (production uses path-based routing)
+          if [ "$ENV" = "production" ]; then
+            API_URL="https://academia.icitysystems.org/api"
+          else
+            API_URL="https://api.${BASE_URL#https://}"
+          fi
 
           echo "frontend-url=$BASE_URL" >> $GITHUB_OUTPUT
           echo "api-url=$API_URL" >> $GITHUB_OUTPUT

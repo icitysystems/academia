@@ -229,7 +229,7 @@ export const environments: Record<EnvironmentName, EnvironmentConfig> = {
 		awsRegion: "us-east-1",
 		domainName: "icitysystems.org",
 		subdomain: "academia",
-		// No apiSubdomain - uses default api.academia.icitysystems.org
+		// Production uses path-based routing: academia.icitysystems.org/api
 		hostedZoneId: process.env.HOSTED_ZONE_ID,
 
 		lambda: {
