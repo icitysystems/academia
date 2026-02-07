@@ -1,9 +1,0 @@
-﻿gh : error connecting to api.github.com
-At line:1 char:1
-+ gh run view 21646344398 --repo icitysystems/academia --log 2>&1 | Out ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (error connecting to api.github.com:String) [], Remote 
-   Exception
-    + FullyQualifiedErrorId : NativeCommandError
- 
-check your internet connection or https://githubstatus.com

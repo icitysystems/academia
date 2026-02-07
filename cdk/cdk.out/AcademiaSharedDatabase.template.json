@@ -1,0 +1,585 @@
+{
+ "Description": "Academia RDS PostgreSQL database (db.t3.micro - icitysystems)",
+ "Resources": {
+  "SharedVpc96F0F614": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "academia-shared-vpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/Resource"
+   }
+  },
+  "SharedVpcPublicSubnet1SubnetE66A2D86": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-1a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1/Subnet"
+   }
+  },
+  "SharedVpcPublicSubnet1RouteTableB2E560ED": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1/RouteTable"
+   }
+  },
+  "SharedVpcPublicSubnet1RouteTableAssociationD4F9EC47": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "SharedVpcPublicSubnet1RouteTableB2E560ED"
+    },
+    "SubnetId": {
+     "Ref": "SharedVpcPublicSubnet1SubnetE66A2D86"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "SharedVpcPublicSubnet1DefaultRoute57DB288E": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "SharedVpcIGW869E5885"
+    },
+    "RouteTableId": {
+     "Ref": "SharedVpcPublicSubnet1RouteTableB2E560ED"
+    }
+   },
+   "DependsOn": [
+    "SharedVpcVPCGW9C69B7A5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "SharedVpcPublicSubnet2SubnetE33911D4": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-1b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2/Subnet"
+   }
+  },
+  "SharedVpcPublicSubnet2RouteTableF58D8939": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2/RouteTable"
+   }
+  },
+  "SharedVpcPublicSubnet2RouteTableAssociationAFAB5570": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "SharedVpcPublicSubnet2RouteTableF58D8939"
+    },
+    "SubnetId": {
+     "Ref": "SharedVpcPublicSubnet2SubnetE33911D4"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "SharedVpcPublicSubnet2DefaultRouteD5FF70D7": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "SharedVpcIGW869E5885"
+    },
+    "RouteTableId": {
+     "Ref": "SharedVpcPublicSubnet2RouteTableF58D8939"
+    }
+   },
+   "DependsOn": [
+    "SharedVpcVPCGW9C69B7A5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "SharedVpcIsolatedSubnet1Subnet2FB46B24": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-1a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet1/Subnet"
+   }
+  },
+  "SharedVpcIsolatedSubnet1RouteTable562E4FE1": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet1/RouteTable"
+   }
+  },
+  "SharedVpcIsolatedSubnet1RouteTableAssociationA9441ADE": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "SharedVpcIsolatedSubnet1RouteTable562E4FE1"
+    },
+    "SubnetId": {
+     "Ref": "SharedVpcIsolatedSubnet1Subnet2FB46B24"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet1/RouteTableAssociation"
+   }
+  },
+  "SharedVpcIsolatedSubnet2Subnet96BA40FA": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-1b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet2/Subnet"
+   }
+  },
+  "SharedVpcIsolatedSubnet2RouteTable4B21FD77": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet2/RouteTable"
+   }
+  },
+  "SharedVpcIsolatedSubnet2RouteTableAssociation85A5BE49": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "SharedVpcIsolatedSubnet2RouteTable4B21FD77"
+    },
+    "SubnetId": {
+     "Ref": "SharedVpcIsolatedSubnet2Subnet96BA40FA"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IsolatedSubnet2/RouteTableAssociation"
+   }
+  },
+  "SharedVpcIGW869E5885": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "academia-shared-vpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/IGW"
+   }
+  },
+  "SharedVpcVPCGW9C69B7A5": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "SharedVpcIGW869E5885"
+    },
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/VPCGW"
+   }
+  },
+  "SharedVpcSecretsManagerEndpointSecurityGroup0AA9D055": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "AcademiaSharedDatabase/SharedVpc/SecretsManagerEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": {
+       "Fn::GetAtt": [
+        "SharedVpc96F0F614",
+        "CidrBlock"
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "from ",
+         {
+          "Fn::GetAtt": [
+           "SharedVpc96F0F614",
+           "CidrBlock"
+          ]
+         },
+         ":443"
+        ]
+       ]
+      },
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "academia-shared-vpc"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/SecretsManagerEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "SharedVpcSecretsManagerEndpoint70017CEB": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "SharedVpcSecretsManagerEndpointSecurityGroup0AA9D055",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.us-east-1.secretsmanager",
+    "SubnetIds": [
+     {
+      "Ref": "SharedVpcIsolatedSubnet1Subnet2FB46B24"
+     },
+     {
+      "Ref": "SharedVpcIsolatedSubnet2Subnet96BA40FA"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "academia-shared-vpc"
+     }
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/SharedVpc/SecretsManagerEndpoint/Resource"
+   }
+  },
+  "DbSecurityGroupE9D701AD": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Academia RDS PostgreSQL access security group",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "SharedVpc96F0F614"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/DbSecurityGroup/Resource"
+   }
+  },
+  "DbSecret685A0FA5": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "Academia database credentials for icitysystems RDS instance",
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "password",
+     "PasswordLength": 32,
+     "SecretStringTemplate": "{\"username\":\"academia_admin\",\"host\":\"icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com\",\"port\":5432,\"dbname\":\"academia\",\"engine\":\"postgres\"}"
+    },
+    "Name": "academia/shared/database/credentials"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/DbSecret/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12PQW+DMAyFf0vvIetSafcKTdVOQzBxnYxxN7fgoMQpqhD/fRpjQ9rJfp+e/Wxn3eFg9zsYY4btNeu4sVOlgFcDY3yfCJ2d6gFNfpa6yE2Rmo6xSo2QfrOtK31SeoOmo41v7BijRwZlL39mUwS+gdK240WUgpCeQGmE+xq6qqMq4GdPombxnQGpHvBZ2sGzqKkIU2C9n4JPw3LDf1AX+a97NpEwkMYeBD4o2Kla9DoXSOfZlBR9Crg89Jp0SDob8S3ZS3y4OWcfn+x+d4nMWUii3JMtf+oXNjsAdFYBAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaSharedDatabase/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "VpcId": {
+   "Description": "Shared VPC ID",
+   "Value": {
+    "Ref": "SharedVpc96F0F614"
+   },
+   "Export": {
+    "Name": "academia-shared-vpc-id"
+   }
+  },
+  "DbEndpoint": {
+   "Description": "RDS PostgreSQL endpoint (icitysystems)",
+   "Value": "icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com",
+   "Export": {
+    "Name": "academia-shared-db-endpoint"
+   }
+  },
+  "DbPort": {
+   "Description": "RDS PostgreSQL port",
+   "Value": "5432",
+   "Export": {
+    "Name": "academia-shared-db-port"
+   }
+  },
+  "DbSecretArn": {
+   "Description": "Database credentials secret ARN",
+   "Value": {
+    "Ref": "DbSecret685A0FA5"
+   },
+   "Export": {
+    "Name": "academia-shared-db-secret-arn"
+   }
+  },
+  "DbSecurityGroupId": {
+   "Description": "Database access security group ID",
+   "Value": {
+    "Fn::GetAtt": [
+     "DbSecurityGroupE9D701AD",
+     "GroupId"
+    ]
+   },
+   "Export": {
+    "Name": "academia-shared-db-sg-id"
+   }
+  },
+  "RdsSpecifications": {
+   "Description": "RDS instance specifications",
+   "Value": "{\n  \"instanceIdentifier\": \"icitysystems\",\n  \"instanceClass\": \"db.t3.micro\",\n  \"engine\": \"postgres\",\n  \"engineVersion\": \"15\",\n  \"storageType\": \"gp2\",\n  \"allocatedStorage\": 20,\n  \"maxAllocatedStorage\": 100,\n  \"multiAZ\": false,\n  \"publiclyAccessible\": false,\n  \"databaseName\": \"academia\",\n  \"port\": 5432\n}"
+  },
+  "ExportsOutputFnGetAttDbSecurityGroupE9D701ADGroupId7A7C114A": {
+   "Value": {
+    "Fn::GetAtt": [
+     "DbSecurityGroupE9D701AD",
+     "GroupId"
+    ]
+   },
+   "Export": {
+    "Name": "AcademiaSharedDatabase:ExportsOutputFnGetAttDbSecurityGroupE9D701ADGroupId7A7C114A"
+   }
+  },
+  "ExportsOutputRefSharedVpc96F0F6140AE947C7": {
+   "Value": {
+    "Ref": "SharedVpc96F0F614"
+   },
+   "Export": {
+    "Name": "AcademiaSharedDatabase:ExportsOutputRefSharedVpc96F0F6140AE947C7"
+   }
+  },
+  "ExportsOutputRefDbSecret685A0FA57881E1C6": {
+   "Value": {
+    "Ref": "DbSecret685A0FA5"
+   },
+   "Export": {
+    "Name": "AcademiaSharedDatabase:ExportsOutputRefDbSecret685A0FA57881E1C6"
+   }
+  },
+  "ExportsOutputRefSharedVpcIsolatedSubnet1Subnet2FB46B240A7F37F7": {
+   "Value": {
+    "Ref": "SharedVpcIsolatedSubnet1Subnet2FB46B24"
+   },
+   "Export": {
+    "Name": "AcademiaSharedDatabase:ExportsOutputRefSharedVpcIsolatedSubnet1Subnet2FB46B240A7F37F7"
+   }
+  },
+  "ExportsOutputRefSharedVpcIsolatedSubnet2Subnet96BA40FA7DBD9B35": {
+   "Value": {
+    "Ref": "SharedVpcIsolatedSubnet2Subnet96BA40FA"
+   },
+   "Export": {
+    "Name": "AcademiaSharedDatabase:ExportsOutputRefSharedVpcIsolatedSubnet2Subnet96BA40FA7DBD9B35"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

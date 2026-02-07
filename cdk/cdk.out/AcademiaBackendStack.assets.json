@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "dcd3bd6620bc8ccad3c309d179311017a67b1803cd771ac19240adf336eb908d": {
+      "displayName": "AcademiaBackendStack Template",
+      "source": {
+        "path": "AcademiaBackendStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-b31a26c0": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "dcd3bd6620bc8ccad3c309d179311017a67b1803cd771ac19240adf336eb908d.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

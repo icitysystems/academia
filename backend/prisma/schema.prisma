@@ -1,9 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -1866,3 +1867,137 @@ model SSOConfiguration {
   @@index([institutionId])
 }
 
+// ============================================
+// Payment Consent for Visitors (Stripe)
+// ============================================
+model PaymentConsent {
+  id                    String   @id @default(cuid())
+  email                 String
+  name                  String?
+  stripeCustomerId      String?  @unique
+  acceptedTerms         Boolean  @default(false)
+  acceptedPrivacyPolicy Boolean  @default(false)
+  marketingOptIn        Boolean  @default(false)
+  ipAddress             String?
+  userAgent             String?
+  consentScopes         String?  // JSON array: ["donations", "subscriptions", "payments"]
+  isActive              Boolean  @default(true)
+  
+  // Link to user if they create an account
+  userId                String?
+  
+  consentedAt           DateTime @default(now())
+  revokedAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([email])
+  @@index([stripeCustomerId])
+  @@index([isActive])
+}
+
+// ============================================
+// Webhook Event Log (Stripe Idempotency)
+// ============================================
+model WebhookEventLog {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  eventType      String
+  status         String   @default("pending") // pending, processed, failed
+  payload        String?  // JSON string of event data
+  errorMessage   String?
+  processedAt    DateTime @default(now())
+  
+  @@index([stripeEventId])
+  @@index([eventType])
+  @@index([status])
+  @@index([processedAt])
+}
+
+// ============================================
+// Stripe Connect Accounts
+// ============================================
+model StripeConnectAccount {
+  id               String   @id @default(cuid())
+  stripeAccountId  String   @unique
+  email            String
+  accountType      String   @default("express") // express, standard, custom
+  country          String   @default("US")
+  businessType     String   @default("individual") // individual, company, non_profit
+  chargesEnabled   Boolean  @default(false)
+  payoutsEnabled   Boolean  @default(false)
+  detailsSubmitted Boolean  @default(false)
+  status           String   @default("PENDING") // PENDING, PENDING_VERIFICATION, NEEDS_INFORMATION, ACTIVE, DISABLED
+  
+  // Link to platform user (instructor/organization)
+  userId           String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([stripeAccountId])
+  @@index([email])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// Connect Payment Log (Platform Payments)
+// ============================================
+model ConnectPaymentLog {
+  id                    String    @id @default(cuid())
+  stripePaymentIntentId String    @unique
+  connectedAccountId    String
+  customerEmail         String
+  amount                Int
+  currency              String    @default("usd")
+  applicationFee        Int       @default(0)
+  paymentType           String    // donation, payment, subscription
+  status                String    @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([stripePaymentIntentId])
+  @@index([connectedAccountId])
+  @@index([customerEmail])
+  @@index([status])
+}
+
+// ============================================
+// Connect Transfer Log
+// ============================================
+model ConnectTransferLog {
+  id                 String   @id @default(cuid())
+  stripeTransferId   String   @unique
+  connectedAccountId String
+  amount             Int
+  currency           String   @default("usd")
+  status             String   @default("COMPLETED") // COMPLETED, REVERSED, FAILED
+  
+  createdAt          DateTime @default(now())
+
+  @@index([stripeTransferId])
+  @@index([connectedAccountId])
+}
+
+// ============================================
+// Connect Payout Log
+// ============================================
+model ConnectPayoutLog {
+  id                 String    @id @default(cuid())
+  stripePayoutId     String    @unique
+  connectedAccountId String
+  amount             Int
+  currency           String    @default("usd")
+  status             String    @default("PENDING") // PENDING, PAID, FAILED, CANCELED
+  arrivalDate        DateTime?
+  failureMessage     String?
+  
+  createdAt          DateTime  @default(now())
+
+  @@index([stripePayoutId])
+  @@index([connectedAccountId])
+  @@index([status])
+}

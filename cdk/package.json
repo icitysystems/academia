@@ -1,0 +1,29 @@
+{
+	"name": "academia-infrastructure",
+	"version": "1.0.0",
+	"bin": {
+		"cdk": "bin/cdk.js"
+	},
+	"scripts": {
+		"build": "tsc",
+		"watch": "tsc -w",
+		"cdk": "cdk",
+		"deploy": "cdk deploy --all",
+		"deploy:frontend": "cdk deploy AcademiaFrontendStack",
+		"deploy:backend": "cdk deploy AcademiaBackendStack",
+		"destroy": "cdk destroy --all",
+		"diff": "cdk diff",
+		"synth": "cdk synth"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"aws-cdk": "^2.120.0",
+		"esbuild": "^0.19.0",
+		"typescript": "^5.0.0"
+	},
+	"dependencies": {
+		"aws-cdk-lib": "^2.120.0",
+		"constructs": "^10.0.0",
+		"dotenv": "^17.2.4"
+	}
+}

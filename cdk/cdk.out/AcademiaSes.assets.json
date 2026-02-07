@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "08b189dc3a181b6571201e2da7c461da43639c2be2cda9b5146aa2de9b1a7c54": {
+      "displayName": "AcademiaSes Template",
+      "source": {
+        "path": "AcademiaSes.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "771643347382-us-east-1-356a9a63": {
+          "bucketName": "cdk-hnb659fds-assets-771643347382-us-east-1",
+          "objectKey": "08b189dc3a181b6571201e2da7c461da43639c2be2cda9b5146aa2de9b1a7c54.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::771643347382:role/cdk-hnb659fds-file-publishing-role-771643347382-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

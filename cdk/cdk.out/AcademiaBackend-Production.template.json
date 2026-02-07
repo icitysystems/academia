@@ -1,0 +1,981 @@
+{
+ "Description": "Academia Backend - production",
+ "Resources": {
+  "ImportedDbSGfromAcademiaBackendProductionLambdaSG460F5318543251AF23AF": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow Lambda production to RDS",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputFnGetAttDbSecurityGroupE9D701ADGroupId7A7C114A"
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "LambdaSG9DBFCFB7",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/ImportedDbSG/from AcademiaBackendProductionLambdaSG460F5318:5432"
+   }
+  },
+  "LambdaSG9DBFCFB7": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Academia Lambda SG - production",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputRefSharedVpc96F0F6140AE947C7"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/LambdaSG/Resource"
+   }
+  },
+  "AssetsBucket5CB76180": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "BucketName": "academia-assets-production-771643347382",
+    "CorsConfiguration": {
+     "CorsRules": [
+      {
+       "AllowedHeaders": [
+        "*"
+       ],
+       "AllowedMethods": [
+        "GET",
+        "PUT",
+        "POST",
+        "DELETE"
+       ],
+       "AllowedOrigins": [
+        "https://.academia-example.com",
+        "https://api..academia-example.com",
+        "http://localhost:3000"
+       ],
+       "MaxAge": 3600
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AssetsBucket/Resource"
+   }
+  },
+  "JwtSecretB8834B39": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "Academia JWT secret - production",
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "PasswordLength": 64
+    },
+    "Name": "academia/production/jwt-secret"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/JwtSecret/Resource"
+   }
+  },
+  "StripeSecret80A38A68": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "Stripe API keys - production",
+    "Name": "academia/production/stripe-secret",
+    "SecretString": "{\"secretKey\":\"\",\"webhookSecret\":\"whsec_placeholder\"}"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/StripeSecret/Resource"
+   }
+  },
+  "BackendFunctionServiceRoleCA938F8D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/BackendFunction/ServiceRole/Resource"
+   }
+  },
+  "BackendFunctionServiceRoleDefaultPolicyA83BBE0A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputRefDbSecret685A0FA57881E1C6"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "JwtSecretB8834B39"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "StripeSecret80A38A68"
+       }
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "AssetsBucket5CB76180",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "AssetsBucket5CB76180",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "BackendFunctionServiceRoleDefaultPolicyA83BBE0A",
+    "Roles": [
+     {
+      "Ref": "BackendFunctionServiceRoleCA938F8D"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/BackendFunction/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "BackendFunction63314140": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "ZipFile": "\n\t\t\t\texports.handler = async (event) => {\n\t\t\t\t\treturn {\n\t\t\t\t\t\tstatusCode: 200,\n\t\t\t\t\t\theaders: { 'Content-Type': 'application/json' },\n\t\t\t\t\t\tbody: JSON.stringify({ \n\t\t\t\t\t\t\tmessage: 'Academia Backend - Deploy code via CI/CD',\n\t\t\t\t\t\t\tenvironment: 'production',\n\t\t\t\t\t\t\tdatabase: 'academia',\n\t\t\t\t\t\t\ttimestamp: new Date().toISOString()\n\t\t\t\t\t\t})\n\t\t\t\t\t};\n\t\t\t\t};\n\t\t\t"
+    },
+    "Environment": {
+     "Variables": {
+      "NODE_ENV": "production",
+      "ENVIRONMENT": "production",
+      "FRONTEND_URL": "https://.academia-example.com",
+      "CORS_ORIGINS": "https://.academia-example.com,http://localhost:3000",
+      "DB_SECRET_ARN": {
+       "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputRefDbSecret685A0FA57881E1C6"
+      },
+      "DB_HOST": "icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com",
+      "DB_PORT": "5432",
+      "DB_NAME": "academia",
+      "DATABASE_URL": "postgresql://${DB_USER}:${DB_PASS}@icitysystems.cnpejzsnelnc.us-east-1.rds.amazonaws.com:5432/academia",
+      "STORAGE_PROVIDER": "s3",
+      "AWS_S3_BUCKET": {
+       "Ref": "AssetsBucket5CB76180"
+      },
+      "AWS_S3_REGION": "us-east-1",
+      "JWT_SECRET_ARN": {
+       "Ref": "JwtSecretB8834B39"
+      },
+      "STRIPE_SECRET_ARN": {
+       "Ref": "StripeSecret80A38A68"
+      }
+     }
+    },
+    "FunctionName": "academia-backend-production",
+    "Handler": "dist/lambda.handler",
+    "MemorySize": 2048,
+    "Role": {
+     "Fn::GetAtt": [
+      "BackendFunctionServiceRoleCA938F8D",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs20.x",
+    "Timeout": 30,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::GetAtt": [
+        "LambdaSG9DBFCFB7",
+        "GroupId"
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputRefSharedVpcIsolatedSubnet1Subnet2FB46B240A7F37F7"
+      },
+      {
+       "Fn::ImportValue": "AcademiaSharedDatabase:ExportsOutputRefSharedVpcIsolatedSubnet2Subnet96BA40FA7DBD9B35"
+      }
+     ]
+    }
+   },
+   "DependsOn": [
+    "BackendFunctionServiceRoleDefaultPolicyA83BBE0A",
+    "BackendFunctionServiceRoleCA938F8D"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/BackendFunction/Resource"
+   }
+  },
+  "AcademiaApiEB0FBB35": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "Academia API - production",
+    "Name": "academia-api-production"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Resource"
+   }
+  },
+  "AcademiaApiCloudWatchRole70B1E378": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/CloudWatchRole/Resource"
+   }
+  },
+  "AcademiaApiAccount76A92C05": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "AcademiaApiCloudWatchRole70B1E378",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "AcademiaApiEB0FBB35"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Account"
+   }
+  },
+  "AcademiaApiDeployment07DDCC0Ffa330974a365864105622c2021709ab3": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "Academia API - production",
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "DependsOn": [
+    "AcademiaApiproxyANY5661EAC8",
+    "AcademiaApiproxyOPTIONSF0329A42",
+    "AcademiaApiproxyCA83FD4D",
+    "AcademiaApiANY390A2767",
+    "AcademiaApiOPTIONS2AA78410"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "AcademiaApiDeploymentStageprod6317A01C": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "AcademiaApiDeployment07DDCC0Ffa330974a365864105622c2021709ab3"
+    },
+    "MethodSettings": [
+     {
+      "DataTraceEnabled": false,
+      "HttpMethod": "*",
+      "ResourcePath": "/*",
+      "ThrottlingBurstLimit": 2500,
+      "ThrottlingRateLimit": 5000
+     }
+    ],
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    },
+    "StageName": "prod"
+   },
+   "DependsOn": [
+    "AcademiaApiAccount76A92C05"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "AcademiaApiOPTIONS2AA78410": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'https://.academia-example.com'",
+        "method.response.header.Vary": "'Origin'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+        "method.response.header.Access-Control-Allow-Credentials": "'true'"
+       },
+       "ResponseTemplates": {
+        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"http://localhost:3000\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Vary": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Credentials": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "AcademiaApiEB0FBB35",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/OPTIONS/Resource"
+   }
+  },
+  "AcademiaApiproxyCA83FD4D": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "AcademiaApiEB0FBB35",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "{proxy+}",
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/{proxy+}/Resource"
+   }
+  },
+  "AcademiaApiproxyOPTIONSF0329A42": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'https://.academia-example.com'",
+        "method.response.header.Vary": "'Origin'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+        "method.response.header.Access-Control-Allow-Credentials": "'true'"
+       },
+       "ResponseTemplates": {
+        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"http://localhost:3000\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Vary": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Credentials": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "AcademiaApiproxyCA83FD4D"
+    },
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/{proxy+}/OPTIONS/Resource"
+   }
+  },
+  "AcademiaApiproxyANYApiPermissionAcademiaBackendProductionAcademiaApiEA45C13AANYproxy6BBD55A1": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "BackendFunction63314140",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:us-east-1:771643347382:",
+       {
+        "Ref": "AcademiaApiEB0FBB35"
+       },
+       "/",
+       {
+        "Ref": "AcademiaApiDeploymentStageprod6317A01C"
+       },
+       "/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/{proxy+}/ANY/ApiPermission.AcademiaBackendProductionAcademiaApiEA45C13A.ANY..{proxy+}"
+   }
+  },
+  "AcademiaApiproxyANY5661EAC8": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:us-east-1:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "BackendFunction63314140",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "AcademiaApiproxyCA83FD4D"
+    },
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/{proxy+}/ANY/Resource"
+   }
+  },
+  "AcademiaApiANY390A2767": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "Type": "MOCK"
+    },
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "AcademiaApiEB0FBB35",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "AcademiaApiEB0FBB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AcademiaApi/Default/ANY/Resource"
+   }
+  },
+  "AlertTopic2720D535": {
+   "Type": "AWS::SNS::Topic",
+   "Properties": {
+    "DisplayName": "Academia production Alerts",
+    "TopicName": "academia-alerts-production"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/AlertTopic/Resource"
+   }
+  },
+  "LambdaErrorAlarm646BFA4C": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "Lambda function errors for production environment",
+    "AlarmName": "academia-production-lambda-errors",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "BackendFunction63314140"
+      }
+     }
+    ],
+    "EvaluationPeriods": 2,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 5,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/LambdaErrorAlarm/Resource"
+   }
+  },
+  "LambdaDurationAlarmA8007F1F": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "Lambda function duration exceeds threshold for production",
+    "AlarmName": "academia-production-lambda-duration",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "BackendFunction63314140"
+      }
+     }
+    ],
+    "EvaluationPeriods": 3,
+    "ExtendedStatistic": "p95",
+    "MetricName": "Duration",
+    "Namespace": "AWS/Lambda",
+    "Period": 300,
+    "Threshold": 5000,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/LambdaDurationAlarm/Resource"
+   }
+  },
+  "LambdaThrottlesAlarm13DE03A1": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "Lambda function throttled for production",
+    "AlarmName": "academia-production-lambda-throttles",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "BackendFunction63314140"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Throttles",
+    "Namespace": "AWS/Lambda",
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/LambdaThrottlesAlarm/Resource"
+   }
+  },
+  "Api5xxAlarm31F257DC": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "API Gateway 5xx errors for production",
+    "AlarmName": "academia-production-api-5xx",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "ApiName",
+      "Value": "academia-api-production"
+     }
+    ],
+    "EvaluationPeriods": 2,
+    "MetricName": "5XXError",
+    "Namespace": "AWS/ApiGateway",
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 5,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/Api5xxAlarm/Resource"
+   }
+  },
+  "Api4xxAlarm2D137FC8": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "High rate of API Gateway 4xx errors for production",
+    "AlarmName": "academia-production-api-4xx-high",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "ApiName",
+      "Value": "academia-api-production"
+     }
+    ],
+    "EvaluationPeriods": 3,
+    "MetricName": "4XXError",
+    "Namespace": "AWS/ApiGateway",
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 100,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/Api4xxAlarm/Resource"
+   }
+  },
+  "ApiLatencyAlarm453002C0": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "API Gateway latency exceeded for production",
+    "AlarmName": "academia-production-api-latency",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "ApiName",
+      "Value": "academia-api-production"
+     }
+    ],
+    "EvaluationPeriods": 3,
+    "ExtendedStatistic": "p95",
+    "MetricName": "Latency",
+    "Namespace": "AWS/ApiGateway",
+    "Period": 300,
+    "Threshold": 3000,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/ApiLatencyAlarm/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12QQU/DMAyFf8vumRmdxH0DMXFATC135KWmy9YkVZxQqij/HSUdMDj5s9+znuUKqvUaVgsceSnb87JXB4iNR3kWNbENTpLAkd8iyQri/btpSAan/LRzNgxPpnPELP4MxX9XEryGuA3yTD6LMyXBJB151miwIwexKf1l3WVHj/rQIsTHYKRX1mTtmvfktGJW1iShUEOsbU9ZKHVveyWn4iuUBA6qQ08jThBrYr8ZVHH/4kZKG4wXDzT0dtJkyj1XXeOxKxEzfD9pi0zimfzRtlm80N7Zz+nnj3NS4STYMMRXOyiZ5wWSkL0N7YheHiFuenS6nJQhpYwvwQ/BJ2FsS3Dim4+qgts7WC1OrNTSBeOVJqjn+gXYqol02wEAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "AcademiaBackend-Production/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AcademiaApiEndpointB8FAB250": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AcademiaApiEB0FBB35"
+      },
+      ".execute-api.us-east-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AcademiaApiDeploymentStageprod6317A01C"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "ApiUrl": {
+   "Description": "API URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AcademiaApiEB0FBB35"
+      },
+      ".execute-api.us-east-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AcademiaApiDeploymentStageprod6317A01C"
+      },
+      "/"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "academia-production-api-url"
+   }
+  },
+  "LambdaFunctionName": {
+   "Description": "Lambda function name",
+   "Value": {
+    "Ref": "BackendFunction63314140"
+   },
+   "Export": {
+    "Name": "academia-production-lambda-name"
+   }
+  },
+  "AssetsBucketName": {
+   "Description": "Assets S3 bucket",
+   "Value": {
+    "Ref": "AssetsBucket5CB76180"
+   },
+   "Export": {
+    "Name": "academia-production-assets-bucket"
+   }
+  },
+  "DatabaseName": {
+   "Description": "Database name for this environment",
+   "Value": "academia",
+   "Export": {
+    "Name": "academia-production-db-name"
+   }
+  },
+  "AlertTopicArn": {
+   "Description": "SNS Topic ARN for alerts",
+   "Value": {
+    "Ref": "AlertTopic2720D535"
+   },
+   "Export": {
+    "Name": "academia-production-alert-topic"
+   }
+  },
+  "ExportsOutputRefAcademiaApiEB0FBB3526983528": {
+   "Value": {
+    "Ref": "AcademiaApiEB0FBB35"
+   },
+   "Export": {
+    "Name": "AcademiaBackend-Production:ExportsOutputRefAcademiaApiEB0FBB3526983528"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
